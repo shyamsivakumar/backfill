@@ -29,6 +29,8 @@ func main() {
 		cmdStatus()
 	case "statusline":
 		cmdStatusline()
+	case "statusline-refresh":
+		cmdStatuslineRefresh()
 	case "agents":
 		os.Exit(cmdAgents(args[1:]))
 	case "version", "--version", "-v":
@@ -49,10 +51,10 @@ usage:
   bf uninit                remove the aliases
   bf on | off              enable/disable the footer
   bf status                show device id and dashboard link
-  bf statusline            print a Claude Code status line ad
-  bf agents install        install Claude Code status line integration
-  bf agents remove         remove Claude Code status line integration
-  bf agents status         show Claude Code status line integration status
+  bf statusline            print an agent status line ad
+  bf agents install        install agent status line integrations
+  bf agents remove         remove agent status line integrations
+  bf agents status         show agent status line integration status
 `)
 }
 

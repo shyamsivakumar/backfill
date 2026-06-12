@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 )
@@ -22,6 +23,11 @@ func statuslineCachePath() string {
 	return filepath.Join(home, ".backfill", "statusline-ad.json")
 }
 
+func statuslineRefreshLockPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".backfill", "statusline.refresh.lock")
+}
+
 func cmdStatusline() {
 	io.Copy(io.Discard, os.Stdin)
 
@@ -32,21 +38,86 @@ func cmdStatusline() {
 
 	now := time.Now().Unix()
 	cache, ok := readStatuslineCache()
-	if !ok || now-cache.FetchedAt > 60 {
-		if ok {
-			elapsed := int(now - cache.FetchedAt)
-			if elapsed >= 5 {
-				if elapsed > 90 {
-					elapsed = 90
-				}
-				reportImpressionFast(cfg, cache.Ad, "claude-code", elapsed)
-			}
+	if ok {
+		printStatuslineAd(cfg, cache.Ad)
+		if now-cache.FetchedAt > 60 {
+			spawnStatuslineRefresh()
 		}
-		cache = statuslineCache{Ad: fetchAd(cfg, "claude-code"), FetchedAt: now}
-		writeStatuslineCache(cache)
+		return
 	}
 
+	cache = statuslineCache{Ad: fetchAd(cfg, "claude-code"), FetchedAt: now}
+	writeStatuslineCache(cache)
 	printStatuslineAd(cfg, cache.Ad)
+}
+
+func cmdStatuslineRefresh() {
+	io.Copy(io.Discard, os.Stdin)
+
+	cfg := loadConfig()
+	if !cfg.Enabled {
+		return
+	}
+
+	unlock, ok := acquireStatuslineRefreshLock()
+	if !ok {
+		return
+	}
+	defer unlock()
+
+	now := time.Now().Unix()
+	cache, ok := readStatuslineCache()
+	if ok {
+		elapsed := int(now - cache.FetchedAt)
+		if elapsed >= 5 {
+			if elapsed > 90 {
+				elapsed = 90
+			}
+			reportImpressionFast(cfg, cache.Ad, "claude-code", elapsed)
+		}
+	}
+
+	cache = statuslineCache{Ad: fetchAd(cfg, "claude-code"), FetchedAt: now}
+	writeStatuslineCache(cache)
+}
+
+func spawnStatuslineRefresh() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	cmd := exec.Command(exe, "statusline-refresh")
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	cmd.Start()
+}
+
+func acquireStatuslineRefreshLock() (func(), bool) {
+	p := statuslineRefreshLockPath()
+	os.MkdirAll(filepath.Dir(p), 0o755)
+
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err == nil {
+		f.Close()
+		return func() { os.Remove(p) }, true
+	}
+
+	info, statErr := os.Stat(p)
+	if statErr != nil {
+		return func() {}, false
+	}
+	if time.Since(info.ModTime()) < 30*time.Second {
+		return func() {}, false
+	}
+
+	os.Remove(p)
+	f, err = os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return func() {}, false
+	}
+	f.Close()
+	return func() { os.Remove(p) }, true
 }
 
 func readStatuslineCache() (statuslineCache, bool) {
