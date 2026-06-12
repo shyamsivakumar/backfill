@@ -27,6 +27,10 @@ func main() {
 		fmt.Printf("backfill footer: %s\n", args[0])
 	case "status":
 		cmdStatus()
+	case "statusline":
+		cmdStatusline()
+	case "agents":
+		os.Exit(cmdAgents(args[1:]))
 	case "version", "--version", "-v":
 		fmt.Println("bf", version)
 	case "help", "--help", "-h":
@@ -45,6 +49,10 @@ usage:
   bf uninit                remove the aliases
   bf on | off              enable/disable the footer
   bf status                show device id and dashboard link
+  bf statusline            print a Claude Code status line ad
+  bf agents install        install Claude Code status line integration
+  bf agents remove         remove Claude Code status line integration
+  bf agents status         show Claude Code status line integration status
 `)
 }
 
