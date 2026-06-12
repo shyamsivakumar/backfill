@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "backfill-cli"
+version = "0.2.0"
+description = "Get paid while your builds run — terminal ad footer (bf)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+dependencies = []
+
+[project.scripts]
+bf = "backfill_cli:main"
+
+[project.urls]
+Homepage = "https://backfill.sh"
+Source = "https://github.com/shyamsivakumar/backfill"

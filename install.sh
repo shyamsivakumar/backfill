@@ -57,6 +57,41 @@ chmod 755 "$bindir/bf" || fail "could not chmod $bindir/bf"
 
 echo "installed bf to $bindir/bf"
 
+config_dir="$HOME/.backfill"
+config_file="$config_dir/config.json"
+if { [ "${BACKFILL_API+x}" ] || [ "${BACKFILL_DEVICE+x}" ]; } && [ ! -e "$config_file" ]; then
+  api="${BACKFILL_API-}"
+  device="${BACKFILL_DEVICE-}"
+
+  case "$api" in
+    *\"* | *\\*)
+      echo "warning: BACKFILL_API contains a double quote or backslash; not writing $config_file" >&2
+      api_bad=1
+      ;;
+    *)
+      api_bad=0
+      ;;
+  esac
+
+  case "$device" in
+    *\"* | *\\*)
+      echo "warning: BACKFILL_DEVICE contains a double quote or backslash; not writing $config_file" >&2
+      device_bad=1
+      ;;
+    *)
+      device_bad=0
+      ;;
+  esac
+
+  if [ "$api_bad" -eq 0 ] && [ "$device_bad" -eq 0 ]; then
+    mkdir -p "$config_dir" || fail "could not create $config_dir"
+    printf '{"device_id": "%s", "enabled": true, "api_base": "%s"}\n' "$device" "$api" >"$config_file" || fail "could not write $config_file"
+    chmod 600 "$config_file" || fail "could not chmod $config_file"
+    echo "wrote $config_file:"
+    cat "$config_file"
+  fi
+fi
+
 case ":${PATH:-}:" in
   *":$bindir:"*) ;;
   *) echo "add $bindir to your PATH to run bf from any shell" ;;

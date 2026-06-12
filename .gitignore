@@ -7,3 +7,4 @@ cli/bf
 next-env.d.ts
 .vercel/
 web/
+python/dist/

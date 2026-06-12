@@ -27,14 +27,26 @@ func loadConfig() *Config {
 	}
 	cfg.DeviceID = stripControlChars(cfg.DeviceID)
 	cfg.APIBase = stripControlChars(cfg.APIBase)
+
+	deviceOverride := ""
+	if v := os.Getenv("BACKFILL_DEVICE"); v != "" {
+		v = stripControlChars(v)
+		if v != "" && len(v) <= 64 {
+			deviceOverride = v
+		}
+	}
+
 	if !validAPIBase(cfg.APIBase) {
 		cfg.APIBase = defaultAPIBase
 	}
-	if cfg.DeviceID == "" {
+	if cfg.DeviceID == "" && deviceOverride == "" {
 		b := make([]byte, 8)
 		rand.Read(b)
 		cfg.DeviceID = "dev_" + hex.EncodeToString(b)
 		saveConfig(cfg)
+	}
+	if deviceOverride != "" {
+		cfg.DeviceID = deviceOverride
 	}
 	if v := os.Getenv("BACKFILL_API"); v != "" {
 		v = stripControlChars(v)
