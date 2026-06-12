@@ -1,0 +1,9 @@
+node_modules/
+.next/
+cli/bf
+.env
+.env.*
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+web/

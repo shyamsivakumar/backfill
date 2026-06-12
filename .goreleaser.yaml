@@ -1,0 +1,53 @@
+version: 2
+
+project_name: backfill
+
+builds:
+  - id: bf
+    dir: cli
+    main: .
+    binary: bf
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Tag }}
+
+archives:
+  - id: default
+    builds:
+      - bf
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE
+      - src: cli/README.md
+        dst: README.md
+
+checksums:
+  name_template: checksums.txt
+
+release:
+  github:
+    owner: shyamsivakumar
+    name: backfill
+
+brews:
+  - name: backfill
+    repository:
+      owner: shyamsivakumar
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://backfill.sh
+    description: Sponsored footer for long-running CLI commands
+    license: MIT
+    install: |
+      bin.install "bf"
