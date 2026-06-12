@@ -5,6 +5,9 @@ cargo builds, docker builds, and other long waits — advertisers bid for the sl
 half the revenue. The kickbacks.ai model applied to build wait-states, aimed at the data
 stack first.
 
+![bf wrapping a dbt run — sponsored footer on the bottom row](assets/demo.gif)
+
+
 The CLI is open source (MIT) on purpose: the thing running in your terminal is ~600 lines
 of Go you can read in ten minutes, and it is structurally incapable of reading your code,
 command output, or environment — the only fields it ever transmits are device id, ad id,
