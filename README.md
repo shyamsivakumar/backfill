@@ -1,5 +1,7 @@
 # Backfill
 
+[![release](https://img.shields.io/github/v/release/shyamsivakumar/backfill)](https://github.com/shyamsivakumar/backfill/releases) [![PyPI](https://img.shields.io/pypi/v/backfill-cli)](https://pypi.org/project/backfill-cli/) [![license](https://img.shields.io/github/license/shyamsivakumar/backfill)](LICENSE)
+
 Get paid while your pipelines run. A sponsored footer in your terminal during dbt runs,
 cargo builds, docker builds, and other long waits — advertisers bid for the slot, you keep
 half the revenue. The kickbacks.ai model applied to build wait-states, aimed at the data
