@@ -1,0 +1,14 @@
+{
+  "name": "backfill",
+  "owner": {
+    "name": "Shyam Sivakumar",
+    "url": "https://backfill.sh"
+  },
+  "plugins": [
+    {
+      "name": "backfill",
+      "source": "./plugin",
+      "description": "Get paid while Claude Code thinks — one labeled sponsored line in the status line, 50% ad revenue share. Open-source CLI that never reads your code."
+    }
+  ]
+}
