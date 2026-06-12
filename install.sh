@@ -92,6 +92,24 @@ if { [ "${BACKFILL_API+x}" ] || [ "${BACKFILL_DEVICE+x}" ]; } && [ ! -e "$config
   fi
 fi
 
+if [ "${BACKFILL_REF+x}" ]; then
+  ref="${BACKFILL_REF-}"
+  case "$ref" in
+    *\"* | *\\*)
+      echo "warning: BACKFILL_REF contains a double quote or backslash; not sending referral" >&2
+      ;;
+    *)
+      api_base="${BACKFILL_API-https://backfill.sh}"
+      device_id="$("$bindir/bf" status 2>/dev/null | awk '/^device:/ { print $2; exit }')"
+      if [ -n "$device_id" ] && command -v curl >/dev/null 2>&1; then
+        curl -fsS -X POST "$api_base/api/refer" \
+          -H "Content-Type: application/json" \
+          -d "$(printf '{"refereeDeviceId":"%s","referrerDeviceId":"%s"}' "$device_id" "$ref")" >/dev/null 2>&1 || true
+      fi
+      ;;
+  esac
+fi
+
 case ":${PATH:-}:" in
   *":$bindir:"*) ;;
   *) echo "add $bindir to your PATH to run bf from any shell" ;;

@@ -27,6 +27,8 @@ func main() {
 		fmt.Printf("backfill footer: %s\n", args[0])
 	case "status":
 		cmdStatus()
+	case "refer":
+		cmdRefer()
 	case "statusline":
 		cmdStatusline()
 	case "statusline-refresh":
@@ -51,6 +53,7 @@ usage:
   bf uninit                remove the aliases
   bf on | off              enable/disable the footer
   bf status                show device id and dashboard link
+  bf refer                 print your referral install command
   bf statusline            print an agent status line ad
   bf agents install        install agent status line integrations
   bf agents remove         remove agent status line integrations
@@ -62,4 +65,10 @@ func cmdStatus() {
 	cfg := loadConfig()
 	fmt.Printf("device:    %s\nenabled:   %v\napi:       %s\ndashboard: %s/dashboard?d=%s\n",
 		cfg.DeviceID, cfg.Enabled, cfg.APIBase, cfg.APIBase, cfg.DeviceID)
+}
+
+func cmdRefer() {
+	cfg := loadConfig()
+	fmt.Printf("curl -fsSL https://backfill.sh/install.sh | BACKFILL_REF=%s sh\n", cfg.DeviceID)
+	fmt.Println("You earn a 10% bonus on everything they earn (from our half, not theirs).")
 }
