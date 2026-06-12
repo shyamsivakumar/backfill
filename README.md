@@ -43,6 +43,8 @@ bf status        # device id + dashboard link
 BACKFILL_API=https://your-deploy.vercel.app dbt run
 ```
 
+Claude Code users can also install via plugin: `/plugin marketplace add shyamsivakumar/backfill` then `/plugin install backfill@backfill`.
+
 Web:
 
 ```sh
