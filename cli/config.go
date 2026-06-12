@@ -10,14 +10,21 @@ import (
 )
 
 type Config struct {
-	DeviceID string `json:"device_id"`
-	Enabled  bool   `json:"enabled"`
-	APIBase  string `json:"api_base"`
+	DeviceID     string `json:"device_id"`
+	DeviceSecret string `json:"device_secret"`
+	Enabled      bool   `json:"enabled"`
+	APIBase      string `json:"api_base"`
 }
 
 func configPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".backfill", "config.json")
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 func loadConfig() *Config {
@@ -26,6 +33,7 @@ func loadConfig() *Config {
 		json.Unmarshal(b, cfg)
 	}
 	cfg.DeviceID = stripControlChars(cfg.DeviceID)
+	cfg.DeviceSecret = stripControlChars(cfg.DeviceSecret)
 	cfg.APIBase = stripControlChars(cfg.APIBase)
 
 	deviceOverride := ""
@@ -39,12 +47,20 @@ func loadConfig() *Config {
 	if !validAPIBase(cfg.APIBase) {
 		cfg.APIBase = defaultAPIBase
 	}
+
+	changed := false
 	if cfg.DeviceID == "" && deviceOverride == "" {
-		b := make([]byte, 8)
-		rand.Read(b)
-		cfg.DeviceID = "dev_" + hex.EncodeToString(b)
+		cfg.DeviceID = "dev_" + randomHex(8)
+		changed = true
+	}
+	if cfg.DeviceID != "" && cfg.DeviceSecret == "" {
+		cfg.DeviceSecret = randomHex(32)
+		changed = true
+	}
+	if changed {
 		saveConfig(cfg)
 	}
+
 	if deviceOverride != "" {
 		cfg.DeviceID = deviceOverride
 	}
@@ -55,6 +71,10 @@ func loadConfig() *Config {
 		}
 	}
 	return cfg
+}
+
+func claimCode(cfg *Config) string {
+	return cfg.DeviceSecret
 }
 
 func validAPIBase(s string) bool {

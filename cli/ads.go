@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -22,6 +25,8 @@ var houseAds = []Ad{
 	{ID: "house_earn", Text: "This footer pays you. Sign in at backfill to start accruing", URL: "/"},
 	{ID: "house_duckdb", Text: "House pick: DuckDB — in-process OLAP that eats parquet for breakfast", URL: "/r-ext/duckdb"},
 }
+
+var registerDeviceOnce sync.Once
 
 func fetchAd(cfg *Config, cmd string) Ad {
 	client := &http.Client{Timeout: 800 * time.Millisecond}
@@ -52,7 +57,29 @@ func stripControlChars(s string) string {
 	return string(out)
 }
 
+func registerDevice(cfg *Config) {
+	if cfg.DeviceID == "" || cfg.DeviceSecret == "" {
+		return
+	}
+
+	sum := sha256.Sum256([]byte(cfg.DeviceSecret))
+	body, _ := json.Marshal(map[string]any{
+		"deviceId":   cfg.DeviceID,
+		"secretHash": hex.EncodeToString(sum[:]),
+	})
+
+	client := &http.Client{Timeout: 800 * time.Millisecond}
+	resp, err := client.Post(cfg.APIBase+"/api/device/register", "application/json", bytes.NewReader(body))
+	if err == nil {
+		resp.Body.Close()
+	}
+}
+
 func reportImpression(cfg *Config, ad Ad, cmd string, seconds int) {
+	registerDeviceOnce.Do(func() {
+		registerDevice(cfg)
+	})
+
 	body, _ := json.Marshal(map[string]any{
 		"deviceId": cfg.DeviceID,
 		"adId":     ad.ID,

@@ -27,6 +27,8 @@ func main() {
 		fmt.Printf("backfill footer: %s\n", args[0])
 	case "status":
 		cmdStatus()
+	case "claim":
+		cmdClaim()
 	case "refer":
 		cmdRefer()
 	case "statusline":
@@ -53,6 +55,7 @@ usage:
   bf uninit                remove the aliases
   bf on | off              enable/disable the footer
   bf status                show device id and dashboard link
+  bf claim                 print your device claim code
   bf refer                 print your referral install command
   bf statusline            print an agent status line ad
   bf agents install        install agent status line integrations
@@ -65,6 +68,13 @@ func cmdStatus() {
 	cfg := loadConfig()
 	fmt.Printf("device:    %s\nenabled:   %v\napi:       %s\ndashboard: %s/dashboard?d=%s\n",
 		cfg.DeviceID, cfg.Enabled, cfg.APIBase, cfg.APIBase, cfg.DeviceID)
+}
+
+func cmdClaim() {
+	cfg := loadConfig()
+	fmt.Printf("%s/dashboard?d=%s\n", cfg.APIBase, cfg.DeviceID)
+	fmt.Printf("claim code: %s\n", claimCode(cfg))
+	fmt.Println("Paste your device id and this code at backfill.sh/dashboard after logging in. The code proves this machine is yours — anyone can see your device id in ad links, only you have this.")
 }
 
 func cmdRefer() {
