@@ -9,6 +9,10 @@ stack first.
 
 ![bf wrapping a dbt run — sponsored footer on the bottom row](assets/demo.gif)
 
+A real `dbt run` processing under `bf`: dbt's output scrolls, the sponsored line stays
+pinned to the bottom row the whole run, summary and exit code intact.
+
+![bf on a real dbt run — the footer holds the bottom row while models build](assets/dbt-real.gif)
 
 The CLI is open source (MIT) on purpose: the thing running in your terminal is ~600 lines
 of Go you can read in ten minutes, and it is structurally incapable of reading your code,
@@ -38,9 +42,26 @@ CLI (from source for now):
 
 ```sh
 cd cli && go build -o bf . && mv bf /usr/local/bin/
-bf init          # adds shell aliases (dbt, cargo, docker, gradle, xcodebuild, bq, snowsql, spark-submit, sqlmesh)
+bf init          # wrap dbt & friends once, so bare `dbt run` earns (installs PATH shims)
+bf init --all    # or wrap every non-interactive command found on PATH
+bf wrap pytest   # add any tool;  bf unwrap pytest  removes it
 bf status        # device id + dashboard link
-BACKFILL_API=https://your-deploy.vercel.app dbt run
+dbt run          # plain command — the footer shows, no `bf` prefix needed
+```
+
+`bf init` installs a pass-through shim per command into `~/.backfill/shims` and adds that
+dir to your `PATH`. Because it is a real shim and not a shell alias, it fires wherever the
+command runs — your shell, a Makefile, a script. Non-interactive runs (CI, Airflow, dbt
+Cloud) detect no TTY and pass straight through with no footer, and full-screen TUIs (a
+pager, `vim`, `htop`) suppress the footer automatically via the alternate-screen guard.
+
+Agent sessions earn too. `bf agents install` wires the ad into the official status line of
+**Claude Code, Codex, and Factory (`droid`)** — no patching — so the line shows while the
+agent is processing:
+
+```sh
+bf agents install            # claude + codex + factory
+bf agents install factory    # or one at a time
 ```
 
 Claude Code users can also install via plugin: `/plugin marketplace add shyamsivakumar/backfill` then `/plugin install backfill@backfill`.
@@ -80,10 +101,11 @@ ad id, command name (e.g. `dbt`), and visible seconds.
 - [ ] Sell 2–3 flat-rate launch slots to data-tool companies
 - [ ] Affiliate fill (PartnerStack/Impact): `{clickid}` SubID substitution in the click
       redirect, `/api/postback` conversion crediting, serve priority direct → affiliate → house
-- [ ] Claude Code statusline integration (`bf agents install` writes the official
-      `statusLine` + `spinnerVerbs` settings — same public surface kickbacks uses, no patching)
+- [x] Agent status-line integration — `bf agents install` writes the official status line
+      for Claude Code (+ `spinnerVerbs`), Codex (`tui.status_line`), and Factory
+      (`statusLine`), so the ad shows while the agent is processing. No patching.
+- [x] Suspend the footer when the child app enters the alternate screen (full-screen TUIs)
 - [ ] JupyterLab extension (sponsored line in status bar while kernel is busy)
 - [ ] Stripe Connect payouts once balances cross $25
 - [ ] Real-time auction replacing flat slots
 - [ ] Signed serve tokens + per-device credit gates before first paid campaign goes live
-- [ ] Suspend footer when the child app enters the alternate screen (full-screen TUIs)

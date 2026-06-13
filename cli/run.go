@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -14,9 +15,36 @@ import (
 	"golang.org/x/term"
 )
 
+// Alternate-screen enter/leave sequences. While a child is on the alt screen
+// (vim, less, htop, a pager) it owns the whole terminal, so the footer hides
+// itself and stops billing until the app exits.
+var altEnter = [][]byte{[]byte("\x1b[?1049h"), []byte("\x1b[?1047h"), []byte("\x1b[?47h")}
+var altLeave = [][]byte{[]byte("\x1b[?1049l"), []byte("\x1b[?1047l"), []byte("\x1b[?47l")}
+
+func containsAny(b []byte, needles [][]byte) bool {
+	for _, n := range needles {
+		if bytes.Contains(b, n) {
+			return true
+		}
+	}
+	return false
+}
+
+func lastBytes(b []byte, n int) []byte {
+	if len(b) <= n {
+		out := make([]byte, len(b))
+		copy(out, b)
+		return out
+	}
+	out := make([]byte, n)
+	copy(out, b[len(b)-n:])
+	return out
+}
+
 const minBillableSeconds = 5
 
 func runWrapped(args []string) int {
+	deshimPath()
 	bin, err := exec.LookPath(args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "bf: %s: command not found\n", args[0])
@@ -143,11 +171,22 @@ func runWithFooter(cfg *Config, bin string, args []string) int {
 	}()
 
 	buf := make([]byte, 32*1024)
+	var tail []byte // last few bytes, so an alt-screen escape split across reads still registers
 	for {
 		n, rerr := ptmx.Read(buf)
 		if n > 0 {
 			mu.Lock()
-			out.Write(buf[:n])
+			chunk := buf[:n]
+			out.Write(chunk)
+			scan := append(tail, chunk...)
+			if !f.alt && containsAny(scan, altEnter) {
+				f.alt = true
+				fmt.Fprintf(out, "\x1b[r")
+			} else if f.alt && containsAny(scan, altLeave) {
+				f.alt = false
+				fmt.Fprintf(out, "\x1b7\x1b[1;%dr\x1b8", f.rows-1)
+			}
+			tail = lastBytes(scan, 7)
 			f.draw(out)
 			mu.Unlock()
 		}
@@ -204,6 +243,7 @@ type footer struct {
 	ad       Ad
 	visible  time.Duration
 	lastTick time.Time
+	alt      bool
 }
 
 // Accrue visible time in clamped deltas so a laptop suspend or stopped
@@ -214,13 +254,16 @@ func (f *footer) accrue() {
 	if delta > 2*time.Second {
 		delta = 2 * time.Second
 	}
-	if delta > 0 {
+	if delta > 0 && !f.alt {
 		f.visible += delta
 	}
 	f.lastTick = now
 }
 
 func (f *footer) draw(out io.Writer) {
+	if f.alt {
+		return
+	}
 	max := f.cols - 4
 	if max < 12 {
 		return

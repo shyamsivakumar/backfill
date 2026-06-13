@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
-	DeviceID     string `json:"device_id"`
-	DeviceSecret string `json:"device_secret"`
-	Enabled      bool   `json:"enabled"`
-	APIBase      string `json:"api_base"`
+	DeviceID     string   `json:"device_id"`
+	DeviceSecret string   `json:"device_secret"`
+	Enabled      bool     `json:"enabled"`
+	APIBase      string   `json:"api_base"`
+	Wrap         []string `json:"wrap,omitempty"`
 }
 
 func configPath() string {

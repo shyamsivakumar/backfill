@@ -28,11 +28,22 @@ func codexConfigBackupPath() string {
 	return filepath.Join(home, ".backfill", "codex-config.backup.toml")
 }
 
+func factorySettingsPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".factory", "settings.json")
+}
+
+func factorySettingsBackupPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".backfill", "factory-settings.backup.json")
+}
+
 type agentTarget string
 
 const (
-	agentClaude agentTarget = "claude"
-	agentCodex  agentTarget = "codex"
+	agentClaude  agentTarget = "claude"
+	agentCodex   agentTarget = "codex"
+	agentFactory agentTarget = "factory"
 )
 
 func cmdAgents(args []string) int {
@@ -71,9 +82,9 @@ func cmdAgents(args []string) int {
 
 func agentsUsage() {
 	fmt.Print(`usage:
-  bf agents install [claude|codex|all] [--force]
-  bf agents remove [claude|codex|all]
-  bf agents status [claude|codex|all]
+  bf agents install [claude|codex|factory|all] [--force]
+  bf agents remove [claude|codex|factory|all]
+  bf agents status [claude|codex|factory|all]
 `)
 }
 
@@ -88,7 +99,7 @@ func parseAgentArgs(args []string, allowForce bool) ([]agentTarget, bool, bool) 
 				return nil, false, false
 			}
 			force = true
-		case "claude", "codex", "all":
+		case "claude", "codex", "factory", "all":
 			if target != "all" {
 				return nil, false, false
 			}
@@ -103,8 +114,10 @@ func parseAgentArgs(args []string, allowForce bool) ([]agentTarget, bool, bool) 
 		return []agentTarget{agentClaude}, force, true
 	case "codex":
 		return []agentTarget{agentCodex}, force, true
+	case "factory":
+		return []agentTarget{agentFactory}, force, true
 	default:
-		return []agentTarget{agentClaude, agentCodex}, force, true
+		return []agentTarget{agentClaude, agentCodex, agentFactory}, force, true
 	}
 }
 
@@ -117,6 +130,8 @@ func cmdAgentsInstall(targets []agentTarget, force bool) int {
 			code = installClaudeAgent(force)
 		case agentCodex:
 			code = installCodexAgent(force)
+		case agentFactory:
+			code = installFactoryAgent(force)
 		}
 		if code != 0 {
 			exit = code
@@ -134,6 +149,8 @@ func cmdAgentsRemove(targets []agentTarget) int {
 			code = removeClaudeAgent()
 		case agentCodex:
 			code = removeCodexAgent()
+		case agentFactory:
+			code = removeFactoryAgent()
 		}
 		if code != 0 {
 			exit = code
@@ -151,6 +168,8 @@ func cmdAgentsStatus(targets []agentTarget) int {
 			code = statusClaudeAgent()
 		case agentCodex:
 			code = statusCodexAgent()
+		case agentFactory:
+			code = statusFactoryAgent()
 		}
 		if code != 0 {
 			exit = code
@@ -417,6 +436,147 @@ func statusCodexAgent() int {
 	fmt.Printf("Codex current status_line: %s\n", strings.TrimRight(line, "\r\n"))
 	fmt.Printf("Codex backfill: %v\n", isBackfillCodexStatusLine(line))
 	return 0
+}
+
+func installFactoryAgent(force bool) int {
+	settings, original, exists, err := readJSONSettings(factorySettingsPath())
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+
+	if current, ok := settings["statusLine"]; ok && !isBackfillStatusLine(current) && !force {
+		fmt.Printf("Factory existing statusLine: %s\n", jsonValue(current))
+		fmt.Println("Factory refusing to overwrite statusLine; rerun with --force to replace it")
+		return 1
+	}
+
+	if exists {
+		backupFactorySettings(original)
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+
+	settings["statusLine"] = map[string]any{
+		"command": exe + " statusline",
+		"padding": 0,
+	}
+
+	if err := writeJSONSettingsAtomic(factorySettingsPath(), settings); err != nil {
+		fmt.Println(err)
+		return 1
+	}
+
+	fmt.Printf("Factory installed statusLine: %s statusline\n", exe)
+	fmt.Println("Factory ads will appear in the status line above the input")
+	return 0
+}
+
+func removeFactoryAgent() int {
+	settings, _, exists, err := readJSONSettings(factorySettingsPath())
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	if !exists {
+		fmt.Println("Factory settings not found; backfill statusLine is not installed")
+		return 0
+	}
+
+	current, ok := settings["statusLine"]
+	if !ok || !isBackfillStatusLine(current) {
+		fmt.Printf("Factory current statusLine: %s\n", jsonValue(current))
+		fmt.Println("Factory backfill statusLine is not installed")
+		return 0
+	}
+
+	if backup, ok := readFactorySettingsBackup(); ok {
+		if restored, has := backup["statusLine"]; has {
+			settings["statusLine"] = restored
+			if err := writeJSONSettingsAtomic(factorySettingsPath(), settings); err != nil {
+				fmt.Println(err)
+				return 1
+			}
+			fmt.Printf("Factory restored previous statusLine: %s\n", jsonValue(restored))
+			return 0
+		}
+	}
+
+	delete(settings, "statusLine")
+	if err := writeJSONSettingsAtomic(factorySettingsPath(), settings); err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	fmt.Println("Factory removed backfill statusLine")
+	return 0
+}
+
+func statusFactoryAgent() int {
+	settings, _, exists, err := readJSONSettings(factorySettingsPath())
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	if !exists {
+		fmt.Println("Factory current statusLine: null")
+		fmt.Println("Factory backfill: false")
+		return 0
+	}
+	current, ok := settings["statusLine"]
+	if !ok {
+		fmt.Println("Factory current statusLine: null")
+		fmt.Println("Factory backfill: false")
+		return 0
+	}
+	fmt.Printf("Factory current statusLine: %s\n", jsonValue(current))
+	fmt.Printf("Factory backfill: %v\n", isBackfillStatusLine(current))
+	return 0
+}
+
+func backupFactorySettings(original []byte) {
+	p := factorySettingsBackupPath()
+	if _, err := os.Stat(p); err == nil {
+		return
+	}
+	os.MkdirAll(filepath.Dir(p), 0o755)
+	os.WriteFile(p, original, 0o600)
+}
+
+func readFactorySettingsBackup() (map[string]any, bool) {
+	b, err := os.ReadFile(factorySettingsBackupPath())
+	if err != nil {
+		return nil, false
+	}
+	var settings map[string]any
+	if json.Unmarshal(b, &settings) != nil || settings == nil {
+		return nil, false
+	}
+	return settings, true
+}
+
+func readJSONSettings(p string) (map[string]any, []byte, bool, error) {
+	b, err := os.ReadFile(p)
+	if os.IsNotExist(err) {
+		return map[string]any{}, nil, false, nil
+	}
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if len(b) == 0 {
+		return map[string]any{}, b, true, nil
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(b, &settings); err != nil {
+		return nil, nil, true, err
+	}
+	if settings == nil {
+		settings = map[string]any{}
+	}
+	return settings, b, true, nil
 }
 
 func readClaudeSettings() (map[string]any, []byte, bool, error) {

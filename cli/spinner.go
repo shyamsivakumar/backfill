@@ -109,7 +109,10 @@ func cmdSpinnerRefresh() {
 }
 
 func writeClaudeSettingsAtomic(settings map[string]any) error {
-	p := claudeSettingsPath()
+	return writeJSONSettingsAtomic(claudeSettingsPath(), settings)
+}
+
+func writeJSONSettingsAtomic(p string, settings map[string]any) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}

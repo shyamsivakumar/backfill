@@ -17,9 +17,22 @@ func main() {
 	}
 	switch args[0] {
 	case "init":
-		cmdAliases(false)
+		all := false
+		var extra []string
+		for _, a := range args[1:] {
+			if a == "--all" {
+				all = true
+			} else {
+				extra = append(extra, a)
+			}
+		}
+		os.Exit(cmdInit(extra, all))
 	case "uninit":
-		cmdAliases(true)
+		os.Exit(cmdUninit())
+	case "wrap":
+		os.Exit(cmdWrap(args[1:]))
+	case "unwrap":
+		os.Exit(cmdUnwrap(args[1:]))
 	case "on", "off":
 		cfg := loadConfig()
 		cfg.Enabled = args[0] == "on"
@@ -53,8 +66,11 @@ func usage() {
 
 usage:
   bf <command> [args...]   run a command with a sponsored footer (e.g. bf dbt run)
-  bf init                  add shell aliases for supported commands
-  bf uninit                remove the aliases
+  bf init [cmd...]         wrap dbt & friends so bare commands earn (one time)
+  bf init --all            wrap every non-interactive command found on PATH
+  bf uninit                remove the wrapping
+  bf wrap <cmd>...         also wrap these commands
+  bf unwrap <cmd>...       stop wrapping these commands
   bf on | off              enable/disable the footer
   bf status                show device id and dashboard link
   bf claim                 print your device claim code
