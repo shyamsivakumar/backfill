@@ -166,10 +166,11 @@ func installClaudeAgent(force bool) int {
 		return 1
 	}
 
+	statusLineBlocked := false
 	if current, ok := settings["statusLine"]; ok && !isBackfillStatusLine(current) && !force {
 		fmt.Printf("Claude Code existing statusLine: %s\n", jsonValue(current))
-		fmt.Println("Claude Code refusing to overwrite; rerun with --force to replace it")
-		return 1
+		fmt.Println("Claude Code refusing to overwrite statusLine; rerun with --force to replace it")
+		statusLineBlocked = true
 	}
 
 	if exists {
@@ -182,10 +183,28 @@ func installClaudeAgent(force bool) int {
 		return 1
 	}
 
-	settings["statusLine"] = map[string]any{
-		"type":    "command",
-		"command": exe + " statusline",
-		"padding": 0,
+	cfg := loadConfig()
+	ad := fetchAd(cfg, "claude-code")
+	ad.Text = stripControlChars(ad.Text)
+	if err := setSpinnerVerb([]string{ad.Text}); err != nil {
+		fmt.Println(err)
+		return 1
+	}
+
+	settings, _, _, err = readClaudeSettings()
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+
+	installSpinnerRefreshHook(settings, exe)
+
+	if !statusLineBlocked {
+		settings["statusLine"] = map[string]any{
+			"type":    "command",
+			"command": exe + " statusline",
+			"padding": 0,
+		}
 	}
 
 	if err := writeClaudeSettings(settings); err != nil {
@@ -193,8 +212,12 @@ func installClaudeAgent(force bool) int {
 		return 1
 	}
 
-	fmt.Printf("Claude Code installed statusLine: %s statusline\n", exe)
-	fmt.Println("Claude Code ads will appear in the status line")
+	if !statusLineBlocked {
+		fmt.Printf("Claude Code installed statusLine: %s statusline\n", exe)
+		fmt.Println("Claude Code ads will appear in the status line")
+	}
+	fmt.Printf("Claude Code installed spinner verb replacement: %s spinner-refresh\n", exe)
+	fmt.Println("Claude Code ads will appear in the thinking spinner")
 	return 0
 }
 
@@ -209,10 +232,34 @@ func removeClaudeAgent() int {
 		return 0
 	}
 
+	if err := removeSpinnerVerb(); err != nil {
+		fmt.Println(err)
+		return 1
+	}
+
+	settings, _, exists, err = readClaudeSettings()
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	if !exists {
+		fmt.Println("Claude Code settings not found; backfill statusLine is not installed")
+		return 0
+	}
+
+	removedHook := removeSpinnerRefreshHook(settings)
+
 	current, ok := settings["statusLine"]
 	if !ok || !isBackfillStatusLine(current) {
+		if removedHook {
+			if err := writeClaudeSettings(settings); err != nil {
+				fmt.Println(err)
+				return 1
+			}
+		}
 		fmt.Printf("Claude Code current statusLine: %s\n", jsonValue(current))
 		fmt.Println("Claude Code backfill statusLine is not installed")
+		fmt.Println("Claude Code removed spinner verb replacement")
 		return 0
 	}
 
@@ -225,6 +272,7 @@ func removeClaudeAgent() int {
 				return 1
 			}
 			fmt.Printf("Claude Code restored previous statusLine: %s\n", jsonValue(restored))
+			fmt.Println("Claude Code removed spinner verb replacement")
 			return 0
 		}
 	}
@@ -235,6 +283,7 @@ func removeClaudeAgent() int {
 		return 1
 	}
 	fmt.Println("Claude Code removed backfill statusLine")
+	fmt.Println("Claude Code removed spinner verb replacement")
 	return 0
 }
 
@@ -247,6 +296,8 @@ func statusClaudeAgent() int {
 	if !exists {
 		fmt.Println("Claude Code current statusLine: null")
 		fmt.Println("Claude Code backfill: false")
+		fmt.Println("Claude Code spinnerVerbs: false")
+		fmt.Println("Claude Code spinner-refresh hook: false")
 		return 0
 	}
 
@@ -254,11 +305,13 @@ func statusClaudeAgent() int {
 	if !ok {
 		fmt.Println("Claude Code current statusLine: null")
 		fmt.Println("Claude Code backfill: false")
-		return 0
+	} else {
+		fmt.Printf("Claude Code current statusLine: %s\n", jsonValue(current))
+		fmt.Printf("Claude Code backfill: %v\n", isBackfillStatusLine(current))
 	}
-
-	fmt.Printf("Claude Code current statusLine: %s\n", jsonValue(current))
-	fmt.Printf("Claude Code backfill: %v\n", isBackfillStatusLine(current))
+	_, hasSpinner := settings["spinnerVerbs"]
+	fmt.Printf("Claude Code spinnerVerbs: %v\n", hasSpinner)
+	fmt.Printf("Claude Code spinner-refresh hook: %v\n", hasSpinnerRefreshHook(settings))
 	return 0
 }
 
@@ -390,11 +443,7 @@ func readClaudeSettings() (map[string]any, []byte, bool, error) {
 }
 
 func writeClaudeSettings(settings map[string]any) error {
-	p := claudeSettingsPath()
-	os.MkdirAll(filepath.Dir(p), 0o755)
-	b, _ := json.MarshalIndent(settings, "", "  ")
-	b = append(b, '\n')
-	return os.WriteFile(p, b, 0o600)
+	return writeClaudeSettingsAtomic(settings)
 }
 
 func backupClaudeSettings(original []byte) {
@@ -598,6 +647,96 @@ func statusLineCommand(v any) string {
 	}
 	command, _ := m["command"].(string)
 	return command
+}
+
+func installSpinnerRefreshHook(settings map[string]any, exe string) bool {
+	hooks, _ := settings["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+		settings["hooks"] = hooks
+	}
+
+	sessionStart, _ := hooks["SessionStart"].([]any)
+	if sessionStartHasCommand(sessionStart, "spinner-refresh") {
+		return false
+	}
+
+	entry := map[string]any{
+		"hooks": []any{
+			map[string]any{
+				"type":    "command",
+				"command": exe + " spinner-refresh",
+				"timeout": 5,
+			},
+		},
+	}
+	hooks["SessionStart"] = append(sessionStart, entry)
+	return true
+}
+
+func removeSpinnerRefreshHook(settings map[string]any) bool {
+	hooks, _ := settings["hooks"].(map[string]any)
+	if hooks == nil {
+		return false
+	}
+
+	sessionStart, _ := hooks["SessionStart"].([]any)
+	if len(sessionStart) == 0 {
+		return false
+	}
+
+	filtered := make([]any, 0, len(sessionStart))
+	removed := false
+	for _, entry := range sessionStart {
+		if hookEntryReferencesCommand(entry, "spinner-refresh") {
+			removed = true
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	if removed {
+		hooks["SessionStart"] = filtered
+	}
+	return removed
+}
+
+func hasSpinnerRefreshHook(settings map[string]any) bool {
+	hooks, _ := settings["hooks"].(map[string]any)
+	if hooks == nil {
+		return false
+	}
+	sessionStart, _ := hooks["SessionStart"].([]any)
+	return sessionStartHasCommand(sessionStart, "spinner-refresh")
+}
+
+func sessionStartHasCommand(entries []any, needle string) bool {
+	for _, entry := range entries {
+		if hookEntryReferencesCommand(entry, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func hookEntryReferencesCommand(v any, needle string) bool {
+	switch x := v.(type) {
+	case map[string]any:
+		if command, ok := x["command"].(string); ok && strings.Contains(command, needle) {
+			return true
+		}
+		for _, child := range x {
+			if hookEntryReferencesCommand(child, needle) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range x {
+			if hookEntryReferencesCommand(child, needle) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func jsonValue(v any) string {

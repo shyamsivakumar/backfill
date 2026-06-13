@@ -35,6 +35,8 @@ func main() {
 		cmdStatusline()
 	case "statusline-refresh":
 		cmdStatuslineRefresh()
+	case "spinner-refresh":
+		cmdSpinnerRefresh()
 	case "agents":
 		os.Exit(cmdAgents(args[1:]))
 	case "version", "--version", "-v":
