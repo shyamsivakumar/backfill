@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 )
 
 var version = "0.1.0"
@@ -52,6 +53,19 @@ func main() {
 		cmdSpinnerRefresh()
 	case "agents":
 		os.Exit(cmdAgents(args[1:]))
+	case "spin":
+		if len(args) < 2 {
+			fmt.Println("usage: bf spin <agent-command> [args...]")
+			os.Exit(2)
+		}
+		cfg := loadConfig()
+		deshimPath()
+		bin, err := exec.LookPath(args[1])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "bf: %s: command not found\n", args[1])
+			os.Exit(127)
+		}
+		os.Exit(runWithRewrite(cfg, bin, args[1:]))
 	case "version", "--version", "-v":
 		fmt.Println("bf", version)
 	case "help", "--help", "-h":

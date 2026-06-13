@@ -54,6 +54,9 @@ func runWrapped(args []string) int {
 	if !cfg.Enabled || !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return runPlain(bin, args)
 	}
+	if isDbtRunFamily(args) {
+		return runDbtProgress(cfg, bin, args)
+	}
 	return runWithFooter(cfg, bin, args)
 }
 

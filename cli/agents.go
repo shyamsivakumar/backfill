@@ -335,39 +335,13 @@ func statusClaudeAgent() int {
 }
 
 func installCodexAgent(force bool) int {
-	original, exists, err := readCodexConfig()
-	if err != nil {
-		fmt.Println(err)
-		return 1
-	}
-
-	line, hasLine := currentCodexStatusLine(original)
-	if hasLine && !isBackfillCodexStatusLine(line) && !force {
-		fmt.Printf("Codex existing status_line: %s\n", strings.TrimRight(line, "\r\n"))
-		fmt.Println("Codex refusing to overwrite; rerun with --force to replace it")
-		return 1
-	}
-
-	if exists {
-		backupCodexConfig(original)
-	} else {
-		backupCodexConfig(nil)
-	}
-
-	exe, err := os.Executable()
-	if err != nil {
-		fmt.Println(err)
-		return 1
-	}
-
-	updated := installCodexStatusLine(original, exe)
-	if err := writeCodexConfig(updated); err != nil {
-		fmt.Println(err)
-		return 1
-	}
-
-	fmt.Printf("Codex installed status_line: %s statusline\n", exe)
-	fmt.Println("Codex ads will appear in the status line")
+	// Codex's status_line is a list of named built-in items (model, directory,
+	// branch, …), not a command runner — writing a command there makes Codex warn
+	// "Ignored invalid status line items" on every startup. There is no config
+	// surface for an ad. The only way into Codex's processing line is `bf spin`.
+	_ = force
+	fmt.Println("Codex has no command-based status line, so there is nothing to install in config.")
+	fmt.Println("Run Codex through the spinner rewriter instead:  bf spin codex")
 	return 0
 }
 
