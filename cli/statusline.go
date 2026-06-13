@@ -132,6 +132,7 @@ func readStatuslineCache() (statuslineCache, bool) {
 	cache.Ad.ID = stripControlChars(cache.Ad.ID)
 	cache.Ad.Text = stripControlChars(cache.Ad.Text)
 	cache.Ad.URL = stripControlChars(cache.Ad.URL)
+	cache.Ad.SpinnerText = stripControlChars(cache.Ad.SpinnerText)
 	return cache, true
 }
 

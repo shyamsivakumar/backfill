@@ -14,16 +14,17 @@ import (
 )
 
 type Ad struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
-	URL  string `json:"url"`
+	ID          string `json:"id"`
+	Text        string `json:"text"`
+	URL         string `json:"url"`
+	SpinnerText string `json:"spinnerText"`
 }
 
 // Shown when the ad server is unreachable. Preview slots — they never earn.
 var houseAds = []Ad{
-	{ID: "house_advertise", Text: "Your ad here — reach data engineers while their pipelines run", URL: "/advertise"},
-	{ID: "house_earn", Text: "This footer pays you. Sign in at backfill to start accruing", URL: "/"},
-	{ID: "house_duckdb", Text: "House pick: DuckDB — in-process OLAP that eats parquet for breakfast", URL: "/r-ext/duckdb"},
+	{ID: "house_advertise", Text: "Your ad here — reach data engineers while their pipelines run", URL: "/advertise", SpinnerText: "your tool here · backfill"},
+	{ID: "house_earn", Text: "This footer pays you. Sign in at backfill to start accruing", URL: "/", SpinnerText: "backfill · you keep half"},
+	{ID: "house_duckdb", Text: "House pick: DuckDB — in-process OLAP that eats parquet for breakfast", URL: "/r-ext/duckdb", SpinnerText: "DuckDB · in-process OLAP"},
 }
 
 var registerDeviceOnce sync.Once
@@ -38,6 +39,7 @@ func fetchAd(cfg *Config, cmd string) Ad {
 			ad.ID = stripControlChars(ad.ID)
 			ad.Text = stripControlChars(ad.Text)
 			ad.URL = stripControlChars(ad.URL)
+			ad.SpinnerText = stripControlChars(ad.SpinnerText)
 			return ad
 		}
 	}

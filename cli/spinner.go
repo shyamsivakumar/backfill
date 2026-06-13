@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -52,6 +53,26 @@ func removeSpinnerVerb() error {
 	return writeClaudeSettingsAtomic(settings)
 }
 
+func spinnerVerbForAd(ad Ad) string {
+	if strings.TrimSpace(ad.SpinnerText) != "" {
+		return strings.TrimSpace(stripControlChars(ad.SpinnerText))
+	}
+
+	text := stripControlChars(ad.Text)
+	if before, _, ok := strings.Cut(text, " — "); ok {
+		return strings.TrimSpace(before)
+	}
+	if before, _, ok := strings.Cut(text, " - "); ok {
+		return strings.TrimSpace(before)
+	}
+
+	runes := []rune(text)
+	if len(runes) > 40 {
+		runes = runes[:40]
+	}
+	return strings.TrimSpace(string(runes))
+}
+
 func cmdSpinnerRefresh() {
 	io.Copy(io.Discard, os.Stdin)
 
@@ -81,9 +102,10 @@ func cmdSpinnerRefresh() {
 	ad.ID = stripControlChars(ad.ID)
 	ad.Text = stripControlChars(ad.Text)
 	ad.URL = stripControlChars(ad.URL)
+	ad.SpinnerText = stripControlChars(ad.SpinnerText)
 
 	writeStatuslineCache(statuslineCache{Ad: ad, FetchedAt: now})
-	setSpinnerVerb([]string{ad.Text})
+	setSpinnerVerb([]string{spinnerVerbForAd(ad)})
 }
 
 func writeClaudeSettingsAtomic(settings map[string]any) error {
