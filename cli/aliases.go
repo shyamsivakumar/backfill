@@ -25,7 +25,13 @@ var defaultWrap = []string{
 	"make", "terraform", "pulumi", "bazel",
 	"npm", "pnpm", "yarn", "pip", "poetry", "uv",
 	"mvn", "pytest", "tox", "go",
+	"droid",
 }
+
+// spinAgents get a `bf spin <cmd>` shim (ad injected into their live spinner)
+// instead of the footer wrapper. Only agents that repaint the spinner as one
+// contiguous line belong here — verified for Factory droid.
+var spinAgents = map[string]bool{"droid": true}
 
 var toolNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._+-]*$`)
 
@@ -91,6 +97,9 @@ func pathBlock() string {
 }
 
 func shimScript(bf, cmd string) string {
+	if spinAgents[cmd] {
+		return fmt.Sprintf("#!/bin/sh\nexec \"%s\" spin %s \"$@\"\n", bf, cmd)
+	}
 	return fmt.Sprintf("#!/bin/sh\nexec \"%s\" %s \"$@\"\n", bf, cmd)
 }
 
