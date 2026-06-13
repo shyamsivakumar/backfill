@@ -8,7 +8,7 @@
     {
       "name": "backfill",
       "source": "./plugin",
-      "description": "Get paid while Claude Code thinks — one labeled sponsored line in the status line, 50% ad revenue share. Open-source CLI that never reads your code."
+      "description": "Get paid while Claude Code thinks \u2014 a subtle sponsored phrase in the thinking spinner, 50% revenue share, auto-activates on install. Open-source CLI that never reads your code."
     }
   ]
 }

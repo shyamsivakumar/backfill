@@ -2,6 +2,8 @@
 description: Install backfill — get paid while Claude Code thinks (50% ad revenue share)
 ---
 
+The backfill plugin auto-activates on install (its SessionStart hook turns on the sponsored thinking-spinner). This command is the manual control: run it to (re)activate, claim your device, or see status.
+
 Set up backfill for this user. backfill puts one clearly-labeled sponsored
 line in Claude Code's status line (via the official statusLine setting) and
 pays the user 50% of ad revenue. Steps:
