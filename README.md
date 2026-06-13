@@ -55,14 +55,24 @@ command runs — your shell, a Makefile, a script. Non-interactive runs (CI, Air
 Cloud) detect no TTY and pass straight through with no footer, and full-screen TUIs (a
 pager, `vim`, `htop`) suppress the footer automatically via the alternate-screen guard.
 
-Agent sessions earn too. `bf agents install` wires the ad into the official status line of
-**Claude Code, Codex, and Factory (`droid`)** — no patching — so the line shows while the
-agent is processing:
+For `dbt run`/`build`/`test`/`seed`/`snapshot`, `bf` switches to a **smart progress** mode:
+it collapses the hundreds of per-node `START`/`OK created` lines into one live progress line
+(`⠹ dbt 5/8 main.fct_orders · ad …`), keeps the version header, errors, and the final
+`PASS/WARN/ERROR` summary, and carries the ad on the line you're actually watching. Exit
+codes and failures pass through untouched.
+
+Agent sessions earn too, on the surface each agent exposes — no patching:
 
 ```sh
-bf agents install            # claude + codex + factory
-bf agents install factory    # or one at a time
+bf agents install claude     # ad replaces the thinking-spinner verb (spinnerVerbs)
+bf agents install factory    # ad in droid's status line
 ```
+
+- **Claude Code** — the ad replaces the "thinking" spinner verb, plus an optional status line.
+- **Factory (`droid`)** — status line, and `bf spin droid` injects the ad into the live
+  spinner. `bf init` wires plain `droid` through it automatically.
+- **Codex** — no third-party status surface exists in the CLI today; only the command-wait
+  footer applies.
 
 Claude Code users can also install via plugin: `/plugin marketplace add shyamsivakumar/backfill` then `/plugin install backfill@backfill`.
 
@@ -101,10 +111,11 @@ ad id, command name (e.g. `dbt`), and visible seconds.
 - [ ] Sell 2–3 flat-rate launch slots to data-tool companies
 - [ ] Affiliate fill (PartnerStack/Impact): `{clickid}` SubID substitution in the click
       redirect, `/api/postback` conversion crediting, serve priority direct → affiliate → house
-- [x] Agent status-line integration — `bf agents install` writes the official status line
-      for Claude Code (+ `spinnerVerbs`), Codex (`tui.status_line`), and Factory
-      (`statusLine`), so the ad shows while the agent is processing. No patching.
+- [x] dbt smart progress — collapse per-node output into one live ad-carrying progress line
+- [x] Agent integration — Claude Code spinner verb (`spinnerVerbs`) + status line; Factory
+      (`droid`) status line and live-spinner injection via `bf spin`. No patching.
 - [x] Suspend the footer when the child app enters the alternate screen (full-screen TUIs)
+- [ ] Codex: no third-party CLI status surface today — revisit if OpenAI opens the status line
 - [ ] JupyterLab extension (sponsored line in status bar while kernel is busy)
 - [ ] Stripe Connect payouts once balances cross $25
 - [ ] Real-time auction replacing flat slots
