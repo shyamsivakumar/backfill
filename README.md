@@ -64,9 +64,11 @@ python -m backfill_cli init && exec $SHELL
 python -m backfill_cli dbt run --select my_model
 ```
 
-On **Paradime**, make it stick for good: Settings → Workspaces → Environment Variables →
-**Code IDE** → add `PATH` = `/workspace/.local/bin:/workspace/.backfill/shims:${PATH}`. Then
-in a fresh terminal, `bf init` once and plain `dbt run` earns every session.
+On **Paradime**, the durable path is `bf init` (it adds a real `export PATH="$HOME/.backfill/shims:$PATH"`
+to `~/.zshrc`, which the Code IDE terminal sources). Open a fresh terminal and `command -v dbt`
+should resolve to `~/.backfill/shims/dbt`. Avoid setting `PATH` through the Code IDE env-var UI:
+those values are stored literally, so a `${PATH}` reference won't expand and will clobber your
+shell's PATH. If you must use it, set the full literal list (system dirs included), not `${PATH}`.
 
 `bf init` installs a pass-through shim per command into `~/.backfill/shims` and adds that
 dir to your `PATH`. Because it is a real shim and not a shell alias, it fires wherever the
