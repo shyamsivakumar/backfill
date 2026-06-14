@@ -38,16 +38,35 @@ What this sells that no other ad network can:
 
 ## Quickstart
 
-CLI (from source for now):
+```sh
+pip install backfill-cli   # downloads + SHA-256-verifies the bf binary on first run
+bf init                    # wrap dbt & friends once, so bare `dbt run` earns (PATH shims)
+bf init --all              # or wrap every non-interactive command found on PATH
+bf wrap pytest             # add any tool;  bf unwrap pytest  removes it
+bf status                  # device id + dashboard link
+dbt run                    # plain command — smart progress + ad, no `bf` prefix needed
+```
+
+The explicit form `bf dbt run` always works without any setup. `bf init` is what lets the
+plain command earn.
+
+### Locked-down containers (Paradime, Codespaces, read-only base env)
+
+When the base Python env isn't writable, `pip install` falls back to `--user` and puts `bf`
+in a dir that isn't on `PATH` (you'll see *"The script bf is installed in '.../.local/bin'
+which is not on PATH"*). That's a pip/platform thing, not a bf bug. Two ways through it:
 
 ```sh
-cd cli && go build -o bf . && mv bf /usr/local/bin/
-bf init          # wrap dbt & friends once, so bare `dbt run` earns (installs PATH shims)
-bf init --all    # or wrap every non-interactive command found on PATH
-bf wrap pytest   # add any tool;  bf unwrap pytest  removes it
-bf status        # device id + dashboard link
-dbt run          # plain command — the footer shows, no `bf` prefix needed
+# bootstrap without bf on PATH (it self-heals PATH into your rc for next shell):
+python -m backfill_cli init && exec $SHELL
+
+# or just use the explicit form, which never needs PATH:
+python -m backfill_cli dbt run --select my_model
 ```
+
+On **Paradime**, make it stick for good: Settings → Workspaces → Environment Variables →
+**Code IDE** → add `PATH` = `/workspace/.local/bin:/workspace/.backfill/shims:${PATH}`. Then
+in a fresh terminal, `bf init` once and plain `dbt run` earns every session.
 
 `bf init` installs a pass-through shim per command into `~/.backfill/shims` and adds that
 dir to your `PATH`. Because it is a real shim and not a shell alias, it fires wherever the
