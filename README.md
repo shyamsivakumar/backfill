@@ -101,6 +101,22 @@ For verbose commands, the per-line noise is the problem, not the wait. `bf` reco
 
 In both cases the ad rides the line your eyes are already on. The header stays, errors stay, the summary stays. Everything in between collapses.
 
+## SQLMesh
+
+`bf init` wraps only `dbt` by default. SQLMesh is first-class. Add it once:
+
+```sh
+bf wrap sqlmesh
+```
+
+Smart progress is active for `sqlmesh plan` and `sqlmesh run`: SQLMesh's per-model output collapses into one live line carrying the ad, the important output and the result stay, and the child exit code passes through. Same engine as the dbt smart progress.
+
+```text
+⠹ sqlmesh applying prod.my_model · ad …
+```
+
+It works from shells, Makefiles, and scripts through the PATH shim. Non-TTY and CI runs pass through plainly, with no footer.
+
 ## Scaffold completion ads
 
 After any of the following exits 0, `bf` prints one persistent sponsored line under the success screen (one impression, regardless of how long the command took):
@@ -115,6 +131,24 @@ After any of the following exits 0, `bf` prints one persistent sponsored line un
 
 The line prints once under whatever success UI the scaffolder drew. These commands finish too fast for the live footer to earn, but their "you're all set, here's what's next" screen is the highest-intent moment in the session.
 
+## npm and package installs
+
+Package installs are long waits worth monetizing. They aren't wrapped by default. Add them:
+
+```sh
+bf wrap npm pnpm yarn bun
+```
+
+Then a plain install rides the sponsored footer on the bottom row while it resolves and downloads:
+
+```sh
+npm install
+```
+
+The package manager's own progress bar stays above the footer untouched. There's no smart-progress collapsing for installs, `bf` just owns the bottom row. CI and non-TTY installs pass through plainly.
+
+Scaffold completions are separate (see above): after `npm create` / `npm init`, the pnpm/yarn/bun equivalents, or `npx create-*` exit 0, `bf` prints one persistent sponsored line under the "you're all set" success screen.
+
 ## Coding agents
 
 `bf` doesn't patch any agent's source. It uses each agent's own exposed surface.
@@ -123,9 +157,8 @@ The line prints once under whatever success UI the scaffolder drew. These comman
 |---|---|---|
 | Claude Code | Ad replaces the thinking-spinner verb, plus an optional status line | `bf agents install claude` |
 | Factory (`droid`) | Status line + live-spinner injection | `bf agents install factory` (status line) + `bf wrap droid` (spinner) |
-| Codex | Ad injected into the processing line via the spinner rewriter (no persistent install) | `bf spin codex` |
-| Gemini CLI | No injectable status surface (full-screen TUI). Only the command-wait footer applies. | n/a |
-| Cursor | No injectable status surface (full-screen TUI). Only the command-wait footer applies. | n/a |
+
+Every other agent CLI (Codex, Gemini CLI, Cursor, aider) still earns through the command-wait footer when you wrap it. None of them expose a status surface backfill can safely inject into today, so there's no deep integration to install.
 
 For Claude Code you can also install via the plugin marketplace: `/plugin marketplace add shyamsivakumar/backfill` then `/plugin install backfill@backfill`. `bf agents remove claude` undoes it.
 
