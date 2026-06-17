@@ -80,7 +80,7 @@ func usage() {
 
 usage:
   bf <command> [args...]   run a command with a sponsored footer (e.g. bf dbt run)
-  bf init [cmd...]         wrap dbt & friends so bare commands earn (one time)
+  bf init [cmd...]         wrap dbt (and any cmds you pass) so bare commands earn (one time)
   bf init --all            wrap every non-interactive command found on PATH
   bf uninit                remove the wrapping
   bf wrap <cmd>...         also wrap these commands

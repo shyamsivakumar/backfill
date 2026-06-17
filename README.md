@@ -40,9 +40,9 @@ What this sells that no other ad network can:
 
 ```sh
 pip install backfill-cli   # downloads + SHA-256-verifies the bf binary on first run
-bf init                    # wrap dbt & friends once, so bare `dbt run` earns (PATH shims)
+bf init                    # wrap dbt once, so bare `dbt run` earns (PATH shims)
+bf wrap cargo docker       # add more tools;  bf unwrap cargo  removes them
 bf init --all              # or wrap every non-interactive command found on PATH
-bf wrap pytest             # add any tool;  bf unwrap pytest  removes it
 bf status                  # device id + dashboard link
 dbt run                    # plain command — smart progress + ad, no `bf` prefix needed
 ```
@@ -91,7 +91,7 @@ bf agents install factory    # ad in droid's status line
 
 - **Claude Code** — the ad replaces the "thinking" spinner verb, plus an optional status line.
 - **Factory (`droid`)** — status line, and `bf spin droid` injects the ad into the live
-  spinner. `bf init` wires plain `droid` through it automatically.
+  spinner. Run `bf wrap droid` to wire plain `droid` through it.
 - **Codex** — no third-party status surface exists in the CLI today; only the command-wait
   footer applies.
 
