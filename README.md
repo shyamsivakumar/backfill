@@ -12,11 +12,11 @@
 
 ```sh
 pip install backfill-cli   # downloads + SHA-256-verifies the bf binary on first run
-bf init                    # wrap dbt once, bare `dbt run` now earns
+bf init                    # wrap the common slow commands; your normal runs now earn
 dbt run                    # runs exactly as before, with a footer that pays
 ```
 
-`bf wrap cargo docker` adds more tools. `bf init --all` wraps everything slow on your `PATH`. `bf uninit` removes it cleanly. The explicit form `bf dbt run` always works with no setup.
+`bf init` wraps a curated set (dbt, sqlmesh, cargo, docker, terraform, npm, and more). `bf init --all` wraps every non-interactive command on your `PATH`. `bf wrap` / `bf unwrap` adjust the list, `bf uninit` removes it. The explicit `bf dbt run` always works with no setup.
 
 ## Install
 
@@ -103,13 +103,7 @@ In both cases the ad rides the line your eyes are already on. The header stays, 
 
 ## SQLMesh
 
-`bf init` wraps only `dbt` by default. SQLMesh is first-class. Add it once:
-
-```sh
-bf wrap sqlmesh
-```
-
-Smart progress is active for `sqlmesh plan` and `sqlmesh run`: SQLMesh's per-model output collapses into one live line carrying the ad, the important output and the result stay, and the child exit code passes through. Same engine as the dbt smart progress.
+SQLMesh is wrapped by `bf init` out of the box (or add it explicitly with `bf wrap sqlmesh`). Smart progress is active for `sqlmesh plan` and `sqlmesh run`: SQLMesh's per-model output collapses into one live line carrying the ad, the important output and the result stay, and the child exit code passes through. Same engine as the dbt smart progress.
 
 ```text
 ⠹ sqlmesh applying prod.my_model · ad …
@@ -133,13 +127,7 @@ The line prints once under whatever success UI the scaffolder drew. These comman
 
 ## npm and package installs
 
-Package installs are long waits worth monetizing. They aren't wrapped by default. Add them:
-
-```sh
-bf wrap npm pnpm yarn bun
-```
-
-Then a plain install rides the sponsored footer on the bottom row while it resolves and downloads:
+Package installs are long waits worth monetizing. `bf init` wraps `npm`, `pnpm`, and `yarn`; add `bun` with `bf wrap bun`. A plain install then rides the sponsored footer on the bottom row while it resolves and downloads:
 
 ```sh
 npm install

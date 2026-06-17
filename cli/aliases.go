@@ -17,10 +17,18 @@ const blockEnd = "# <<< backfill <<<"
 const legacyStart = "# >>> backfill aliases >>>"
 const legacyEnd = "# <<< backfill aliases <<<"
 
-// defaultWrap is the minimal seed for a plain `bf init`: just dbt, so a
-// first-time setup never wraps more than the user expects. Add others with
-// `bf wrap cargo docker ...`, or wrap everything slow on PATH with `bf init --all`.
-var defaultWrap = []string{"dbt"}
+// defaultWrap is the curated set of slow, watch-worthy commands seeded on a
+// plain `bf init`, so one command sets up earning across the tools developers
+// actually wait on. Extend it with `bf wrap`, or wrap every non-interactive
+// command on PATH with `bf init --all`.
+var defaultWrap = []string{
+	"dbt", "sqlmesh", "bq", "snowsql", "spark-submit",
+	"cargo", "docker", "gradle", "xcodebuild",
+	"make", "terraform", "pulumi", "bazel",
+	"npm", "pnpm", "yarn", "pip", "poetry", "uv",
+	"mvn", "pytest", "tox", "go",
+	"droid",
+}
 
 // spinAgents get a `bf spin <cmd>` shim (ad injected into their live spinner)
 // instead of the footer wrapper. Only agents that repaint the spinner as one
