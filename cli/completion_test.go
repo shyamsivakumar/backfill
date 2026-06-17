@@ -126,3 +126,50 @@ func TestCompletionAdLine(t *testing.T) {
 		t.Errorf("completionAdLine: expected two-space indent, got %q", trimmed)
 	}
 }
+
+func TestIsInstallCommand(t *testing.T) {
+	cases := []struct {
+		args []string
+		want bool
+	}{
+		{[]string{"npm", "install"}, true},
+		{[]string{"pnpm", "i"}, true},
+		{[]string{"yarn", "add", "x"}, true},
+		{[]string{"yarn"}, true},
+		{[]string{"bun", "install"}, true},
+		{[]string{"pip", "install", "foo"}, true},
+		{[]string{"pip3", "install"}, true},
+		{[]string{"npm", "run", "build"}, false},
+		{[]string{"npm", "create", "vite"}, false},
+		{[]string{"cargo", "build"}, false},
+		{[]string{"docker", "build"}, false},
+		{nil, false},
+	}
+	for _, c := range cases {
+		if got := isInstallCommand(c.args); got != c.want {
+			t.Errorf("isInstallCommand(%v) = %v, want %v", c.args, got, c.want)
+		}
+	}
+}
+
+func TestIsNpmFamily(t *testing.T) {
+	cases := []struct {
+		args []string
+		want bool
+	}{
+		{[]string{"npm", "run", "build"}, true},
+		{[]string{"npm", "install"}, true},
+		{[]string{"pnpm", "dev"}, true},
+		{[]string{"yarn"}, true},
+		{[]string{"bun", "run", "start"}, true},
+		{[]string{"cargo", "build"}, false},
+		{[]string{"pip", "install"}, false},
+		{[]string{"dbt", "run"}, false},
+		{nil, false},
+	}
+	for _, c := range cases {
+		if got := isNpmFamily(c.args); got != c.want {
+			t.Errorf("isNpmFamily(%v) = %v, want %v", c.args, got, c.want)
+		}
+	}
+}

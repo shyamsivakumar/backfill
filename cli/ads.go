@@ -23,9 +23,9 @@ type Ad struct {
 
 // Shown when the ad server is unreachable. Preview slots — they never earn.
 var houseAds = []Ad{
-	{ID: "house_advertise", Text: "Your ad here · reach data engineers while their pipelines run", URL: "/advertise", SpinnerText: "your tool here · backfill"},
-	{ID: "house_earn", Text: "This footer pays you. Sign in at backfill to start accruing", URL: "/", SpinnerText: "backfill · you keep half"},
-	{ID: "house_duckdb", Text: "House pick: DuckDB · in-process OLAP that eats parquet for breakfast", URL: "/r-ext/duckdb", SpinnerText: "DuckDB · in-process OLAP"},
+	{ID: "house_uv", Text: "uv · fast Python packages and project installs", URL: "https://docs.astral.sh/uv/", SpinnerText: "uv · Python packages"},
+	{ID: "house_ripgrep", Text: "ripgrep · recursive search that respects gitignore", URL: "https://github.com/BurntSushi/ripgrep", SpinnerText: "ripgrep · fast search"},
+	{ID: "house_duckdb", Text: "DuckDB · in-process SQL for analytics and parquet", URL: "https://duckdb.org", SpinnerText: "DuckDB · local OLAP"},
 }
 
 var registerDeviceOnce sync.Once

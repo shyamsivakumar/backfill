@@ -60,6 +60,20 @@ func runWrapped(args []string) int {
 	if isDbtRunFamily(args) {
 		return runDbtProgress(cfg, bin, args)
 	}
+	if isInstallCommand(args) {
+		exit := runPlain(bin, args)
+		if exit == 0 {
+			ad := fetchAd(cfg, args[0])
+			if ad.ID != "" {
+				fmt.Fprint(os.Stdout, completionAdLine(cfg, ad))
+				reportImpression(cfg, ad, args[0], minBillableSeconds)
+			}
+		}
+		return exit
+	}
+	if isNpmFamily(args) {
+		return runPlain(bin, args)
+	}
 	exit, ad, secs := runWithFooter(cfg, bin, args)
 	if isScaffoldCommand(args) && exit == 0 && ad.ID != "" {
 		fmt.Fprint(os.Stdout, completionAdLine(cfg, ad))
