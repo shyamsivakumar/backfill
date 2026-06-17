@@ -158,7 +158,7 @@ Scaffold completions are separate (see above): after `npm create` / `npm init`, 
 | Claude Code | Ad replaces the thinking-spinner verb, plus an optional status line | `bf agents install claude` |
 | Factory (`droid`) | Status line + live-spinner injection | `bf agents install factory` (status line) + `bf wrap droid` (spinner) |
 
-Every other agent CLI (Codex, Gemini CLI, Cursor, aider) still earns through the command-wait footer when you wrap it. None of them expose a status surface backfill can safely inject into today, so there's no deep integration to install.
+Codex carries the ad through `bf spin codex`. Gemini CLI and Cursor run as full-screen TUIs with no surface backfill can safely inject into (the footer suppresses itself on full-screen apps), so there's nothing to install for them today.
 
 For Claude Code you can also install via the plugin marketplace: `/plugin marketplace add shyamsivakumar/backfill` then `/plugin install backfill@backfill`. `bf agents remove claude` undoes it.
 
