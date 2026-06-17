@@ -43,6 +43,12 @@ tar -xzf "$tmp/$name" -C "$tmp" || fail "could not extract archive"
 
 [ -x "$tmp/bf" ] || fail "archive did not contain executable bf"
 
+# macOS 15.4+/26's Code Signing Monitor SIGKILLs the binary's build-machine
+# ad-hoc signature on exec. Re-sign ad-hoc locally so it runs here.
+if [ "$os" = "darwin" ] && command -v codesign >/dev/null 2>&1; then
+  codesign --force --sign - "$tmp/bf" >/dev/null 2>&1 || true
+fi
+
 "$tmp/bf" version >/dev/null 2>&1 || fail "downloaded bf did not run successfully"
 
 if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then

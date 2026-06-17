@@ -4,6 +4,7 @@ import platform
 import re
 import shlex
 import shutil
+import subprocess
 import sys
 import sysconfig
 import tarfile
@@ -81,6 +82,27 @@ def _read_expected_sha256(archive_url, archive_name):
     return unique[0]
 
 
+def _resign_macos(binary):
+    # macOS 15.4+/26's Code Signing Monitor kills Go binaries that arrive carrying
+    # the build machine's linker-signed ad-hoc signature (SIGKILL, crash bug_type
+    # 309). Re-signing ad-hoc on this machine regenerates a signature the monitor
+    # accepts. Best effort: if codesign is missing or fails, leave the binary as-is.
+    if sys.platform != "darwin":
+        return
+    codesign = shutil.which("codesign")
+    if not codesign:
+        return
+    try:
+        subprocess.run(
+            [codesign, "--force", "--sign", "-", str(binary)],
+            check=False,
+            capture_output=True,
+            timeout=30,
+        )
+    except Exception:
+        pass
+
+
 def _download(binary):
     os_name, arch = _target()
     archive_name = f"backfill_{os_name}_{arch}.tar.gz"
@@ -134,6 +156,7 @@ def _download(binary):
         os.chmod(binary_tmp_name, 0o755)
         os.replace(binary_tmp_name, binary)
         binary_tmp_name = None
+        _resign_macos(binary)
         print(f"backfill: downloaded and verified bf {os_name}/{arch}", file=sys.stderr)
     except (urllib.error.URLError, TimeoutError, OSError, tarfile.TarError) as exc:
         _fail(
