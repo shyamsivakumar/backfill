@@ -8,3 +8,6 @@ next-env.d.ts
 .vercel/
 web/
 python/dist/
+
+# go build artifact
+/cli/cli

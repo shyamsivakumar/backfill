@@ -1,40 +1,40 @@
 # dbt Community Forum — "Show and Tell" — beta-tester post
 
 **Category:** Show and Tell
-**Title (primary):** I built a CLI that pays you while dbt runs, and I want a few beta testers
+**Title (primary):** built a thing that pays you while dbt runs, looking for a few testers
 **Title alternates:**
 
-- Get paid for the time you spend watching dbt run? I built this and need honest testers
-- A footer that earns while your models compile (looking for beta testers)
+- get paid for the time you spend watching dbt run? built this, need honest testers
+- a terminal footer that earns while your models compile (looking for testers)
 
 **Image placement:**
 
-- Drag `assets/dbt-real.gif` in right under the first paragraph (the hero).
+- Drag `assets/dbt-real.gif` in right under the first paragraph.
 - Optionally drop `assets/screenshot-dbt-footer.png` near the bottom.
 
 ---
 
-Hey all. I'm Shyam, I work in data and analytics engineering, and I've spent a real fraction of my life watching `dbt run` grind through models. So I built something for that dead time, and I'd like a few of you to tell me whether it's actually useful or just annoying.
+hey all. i'm shyam, i do data/analytics engineering. i spend a good chunk of my day watching dbt run, so i built a small thing for that dead time and i want a few people to tell me if it's actually useful or just annoying.
 
-It's called backfill. It's a small CLI. You run `bf init` once, and after that your normal `dbt run` behaves exactly like before, except a single sponsored line shows up in the bottom row of your terminal while your models compile. You get paid for that wait time. You keep 50%.
+it's called backfill. you run `bf init` once, and after that your normal `dbt run` works exactly like before, except one sponsored line shows up in the bottom row while your models compile. you get paid for the wait. you keep 50%.
 
 *(gif goes here)*
 
-Here are the things I'd be skeptical about if I saw this, answered up front:
+stuff i'd be suspicious of if i saw this, up front:
 
-- It never reads your code, your SQL, your model output, or your results. It wraps the command and owns one footer row. That's the whole surface area.
-- It's open source. One Go binary, you can read exactly what it does.
-- It's opt-in and reversible. `bf uninit` removes the shims and the PATH line cleanly, nothing left behind.
-- `bf init` only wraps `dbt` by default. It won't touch your other commands unless you ask it to with `bf wrap`.
+- it never reads your code, your sql, or your output. it wraps the command and owns one footer row, that's it.
+- it's open source, one go binary: <https://github.com/shyamsivakumar/backfill>
+- it's opt-in and reversible. `bf uninit` removes everything cleanly, nothing left behind.
+- `bf init` only wraps dbt by default. it won't touch your other commands unless you run `bf wrap`.
 
-And yes, an ad in your terminal is a strange idea. I went back and forth on whether it's obnoxious. My bet is that the wait is already dead time, the line stays quiet and out of the way, and getting paid for it beats staring at a spinner. But I honestly don't know yet, which is why I'm posting here instead of on a billboard.
+and yeah, an ad in your terminal is a weird idea. i went back and forth on whether it's annoying. my guess is the wait is already dead time and a quiet line beats a spinner, but i genuinely don't know yet, which is why i'm asking here instead of just shipping it everywhere.
 
-What I'm looking for:
+what i'm after:
 
-- A handful of people willing to run it on real dbt work for a few days.
-- Brutally honest reactions. Does the footer get in the way? Does it feel intrusive? Would you actually leave it on? Anything that makes you go "nope."
+- a few people who'll run it on real dbt work for a few days
+- honest reactions. does the footer get in the way? would you actually leave it on? what makes you go "nope"?
 
-How to try it:
+to try it:
 
 ```
 pip install backfill-cli
@@ -42,12 +42,11 @@ bf init
 dbt run
 ```
 
-Sign in at <https://backfill.sh> to see what you've accrued.
+sign in at <https://backfill.sh> to see what you've racked up.
 
-One honest note on money: you accrue earnings from day one, but actual payouts kick in once there's enough volume to make them worth doing (I'm not going to mail anyone 40 cents). I'll be upfront about where that threshold lands.
+on money, to be straight: you start accruing right away, but payouts only kick in once there's enough volume to be worth it (i'm not going to mail anyone 40 cents). i'll be clear about where that line is.
 
-If you try it and hate it, telling me why is just as useful as telling me you like it. Happy to answer anything about how it works under the hood.
+if you try it and hate it, telling me why helps just as much as telling me you like it. happy to get into how it works under the hood.
 
-Thanks for reading.
-
-— Shyam
+thanks
+— shyam
