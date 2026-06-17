@@ -122,8 +122,8 @@ The line prints once under whatever success UI the scaffolder drew. These comman
 | Agent | Integration | Install |
 |---|---|---|
 | Claude Code | Ad replaces the thinking-spinner verb, plus an optional status line | `bf agents install claude` |
-| Factory (`droid`) | Status line + live-spinner injection | `bf agents install factory` or `bf wrap droid` |
-| Codex | No injectable status surface (full-screen TUI). Only the command-wait footer applies. | n/a |
+| Factory (`droid`) | Status line + live-spinner injection | `bf agents install factory` (status line) + `bf wrap droid` (spinner) |
+| Codex | Ad injected into the processing line via the spinner rewriter (no persistent install) | `bf spin codex` |
 | Gemini CLI | No injectable status surface (full-screen TUI). Only the command-wait footer applies. | n/a |
 | Cursor | No injectable status surface (full-screen TUI). Only the command-wait footer applies. | n/a |
 
@@ -153,6 +153,7 @@ The CLI is structurally incapable of reading your code, command args, command ou
 - **ad id**, the campaign the server chose to serve
 - **command name**, e.g. `dbt` or `cargo`, the bare basename, never the path
 - **visible seconds**, how long the footer was actually on screen, rounded to whole seconds (1 impression = 5 visible seconds)
+- **event kind**, a static label, `impression` or `click`
 
 No args, no paths, no filenames, no env, no stdout or stderr contents. The source is open (MIT, ~600 lines of Go), so you can verify.
 
@@ -187,16 +188,16 @@ The web app is a Next.js (App Router) project on Drizzle + Neon Postgres.
 |---|---|
 | `GET /api/serve` | eCPM ad selection for a given device/command, frequency-capped and flight-gated |
 | `POST /api/events` | Impression / click / visible-seconds events from `bf` |
-| `POST /api/device` | Device registration / first-run handshake |
+| `POST /api/device/register` | Device registration / first-run handshake |
 | `GET /api/balance` | Per-device balance for the dashboard |
-| `POST /api/postback` | Affiliate conversion postback |
+| `GET, POST /api/postback` | Affiliate conversion postback |
 | `POST /api/refer` | Referral attribution |
 | `GET /api/stats` | Aggregate stats for the public stats page |
-| `POST /api/admin` | Admin actions (approve campaigns, refunds) |
+| `POST /api/admin/ads` | Admin actions (approve / toggle campaigns) |
 | `POST /api/advertiser/account` | Advertiser account create/update |
 | `POST /api/advertiser/campaign` | Campaign create/update (status `pending` until admin-approved) |
 | `POST /api/advertiser/deposit` | Prepay Stripe deposit against the account |
-| `POST /api/stripe` | Stripe checkout + webhook |
+| `POST /api/stripe/webhook` | Stripe checkout + webhook |
 | `GET /api/cron/recompute-ecpm` | Nightly Bayesian-shrinkage eCPM recompute across campaigns |
 
 ### Ad selection
@@ -230,7 +231,7 @@ What's covered today:
 - `cli/completion_test.go`, scaffold detection (the `create-*` / `cargo new` / `npm create` allowlist) and the one-line completion ad.
 - `web/lib/ads.test.ts`, eCPM ad selection: frequency cap, flight gating, deterministic tie-break.
 - `web/lib/ecpm.test.ts`, the eCPM math: direct CPM, affiliate expected value, Bayesian shrinkage with `PRIOR_CVR_BPS` and `PRIOR_STRENGTH`.
-- `web/lib/advertiser.test.ts`, advertiser balance math: deposit, spend, attribution, rounding.
+- `web/lib/advertiser.test.ts`, advertiser balance math: deposits, full-CPM spend, balance, rounding.
 
 Run the web tests with `npm test` in `web/`. Run the CLI tests with `go test ./...` in `cli/`.
 
