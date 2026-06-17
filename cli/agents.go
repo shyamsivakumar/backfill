@@ -179,17 +179,15 @@ func cmdAgentsStatus(targets []agentTarget) int {
 }
 
 func installClaudeAgent(force bool) int {
+	// Claude integration is spinner-only: it never installs or touches a
+	// statusLine. Everything (ads, trending content, lifetime earnings) rotates
+	// through the thinking-spinner verbs. force is retained for the CLI surface
+	// but no longer governs a statusLine overwrite.
+	_ = force
 	settings, original, exists, err := readClaudeSettings()
 	if err != nil {
 		fmt.Println(err)
 		return 1
-	}
-
-	statusLineBlocked := false
-	if current, ok := settings["statusLine"]; ok && !isBackfillStatusLine(current) && !force {
-		fmt.Printf("Claude Code existing statusLine: %s\n", jsonValue(current))
-		fmt.Println("Claude Code refusing to overwrite statusLine; rerun with --force to replace it")
-		statusLineBlocked = true
 	}
 
 	if exists {
@@ -203,9 +201,8 @@ func installClaudeAgent(force bool) int {
 	}
 
 	cfg := loadConfig()
-	ad := fetchAd(cfg, "claude-code")
-	ad.Text = stripControlChars(ad.Text)
-	if err := setSpinnerVerb([]string{ad.Text}); err != nil {
+	verbs, _, _ := fetchSpinnerBatch(cfg, 10)
+	if err := setSpinnerVerb(verbs); err != nil {
 		fmt.Println(err)
 		return 1
 	}
@@ -218,25 +215,14 @@ func installClaudeAgent(force bool) int {
 
 	installSpinnerRefreshHook(settings, exe)
 
-	if !statusLineBlocked {
-		settings["statusLine"] = map[string]any{
-			"type":    "command",
-			"command": exe + " statusline",
-			"padding": 0,
-		}
-	}
-
 	if err := writeClaudeSettings(settings); err != nil {
 		fmt.Println(err)
 		return 1
 	}
 
-	if !statusLineBlocked {
-		fmt.Printf("Claude Code installed statusLine: %s statusline\n", exe)
-		fmt.Println("Claude Code ads will appear in the status line")
-	}
-	fmt.Printf("Claude Code installed spinner verb replacement: %s spinner-refresh\n", exe)
-	fmt.Println("Claude Code ads will appear in the thinking spinner")
+	fmt.Printf("Claude Code installed rotating spinner verbs (refresh: %s spinner-refresh)\n", exe)
+	fmt.Println("Claude Code ads + trending content + earnings rotate in the thinking spinner")
+	fmt.Println("Claude Code installed SessionStart + Stop refresh hooks")
 	return 0
 }
 
@@ -320,14 +306,7 @@ func statusClaudeAgent() int {
 		return 0
 	}
 
-	current, ok := settings["statusLine"]
-	if !ok {
-		fmt.Println("Claude Code current statusLine: null")
-		fmt.Println("Claude Code backfill: false")
-	} else {
-		fmt.Printf("Claude Code current statusLine: %s\n", jsonValue(current))
-		fmt.Printf("Claude Code backfill: %v\n", isBackfillStatusLine(current))
-	}
+	fmt.Println("Claude Code statusLine: not managed (intentional; spinner-only)")
 	_, hasSpinner := settings["spinnerVerbs"]
 	fmt.Printf("Claude Code spinnerVerbs: %v\n", hasSpinner)
 	fmt.Printf("Claude Code spinner-refresh hook: %v\n", hasSpinnerRefreshHook(settings))
@@ -790,22 +769,27 @@ func installSpinnerRefreshHook(settings map[string]any, exe string) bool {
 		settings["hooks"] = hooks
 	}
 
-	sessionStart, _ := hooks["SessionStart"].([]any)
-	if sessionStartHasCommand(sessionStart, "spinner-refresh") {
-		return false
-	}
-
-	entry := map[string]any{
-		"hooks": []any{
-			map[string]any{
-				"type":    "command",
-				"command": exe + " spinner-refresh",
-				"timeout": 5,
+	changed := false
+	// SessionStart sets the initial batch; Stop refreshes it and bills one
+	// impression each assistant turn.
+	for _, event := range []string{"SessionStart", "Stop"} {
+		list, _ := hooks[event].([]any)
+		if sessionStartHasCommand(list, "spinner-refresh") {
+			continue
+		}
+		entry := map[string]any{
+			"hooks": []any{
+				map[string]any{
+					"type":    "command",
+					"command": exe + " spinner-refresh",
+					"timeout": 5,
+				},
 			},
-		},
+		}
+		hooks[event] = append(list, entry)
+		changed = true
 	}
-	hooks["SessionStart"] = append(sessionStart, entry)
-	return true
+	return changed
 }
 
 func removeSpinnerRefreshHook(settings map[string]any) bool {
@@ -814,22 +798,21 @@ func removeSpinnerRefreshHook(settings map[string]any) bool {
 		return false
 	}
 
-	sessionStart, _ := hooks["SessionStart"].([]any)
-	if len(sessionStart) == 0 {
-		return false
-	}
-
-	filtered := make([]any, 0, len(sessionStart))
 	removed := false
-	for _, entry := range sessionStart {
-		if hookEntryReferencesCommand(entry, "spinner-refresh") {
-			removed = true
+	for _, event := range []string{"SessionStart", "Stop"} {
+		entries, _ := hooks[event].([]any)
+		if len(entries) == 0 {
 			continue
 		}
-		filtered = append(filtered, entry)
-	}
-	if removed {
-		hooks["SessionStart"] = filtered
+		filtered := make([]any, 0, len(entries))
+		for _, entry := range entries {
+			if hookEntryReferencesCommand(entry, "spinner-refresh") {
+				removed = true
+				continue
+			}
+			filtered = append(filtered, entry)
+		}
+		hooks[event] = filtered
 	}
 	return removed
 }
@@ -839,8 +822,13 @@ func hasSpinnerRefreshHook(settings map[string]any) bool {
 	if hooks == nil {
 		return false
 	}
-	sessionStart, _ := hooks["SessionStart"].([]any)
-	return sessionStartHasCommand(sessionStart, "spinner-refresh")
+	for _, event := range []string{"SessionStart", "Stop"} {
+		entries, _ := hooks[event].([]any)
+		if sessionStartHasCommand(entries, "spinner-refresh") {
+			return true
+		}
+	}
+	return false
 }
 
 func sessionStartHasCommand(entries []any, needle string) bool {

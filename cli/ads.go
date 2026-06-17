@@ -30,10 +30,23 @@ var houseAds = []Ad{
 
 var registerDeviceOnce sync.Once
 
+// httpClient is shared across fetchAd / fetchAdsConcurrent so TCP connections
+// and HTTP keep-alive are reused across the hot per-turn paths. The idle-conn
+// pool is widened past the default of 2 so a concurrent batch reuses warm
+// connections instead of opening a fresh socket per request.
+var httpClient = &http.Client{
+	Timeout: 800 * time.Millisecond,
+	Transport: &http.Transport{
+		MaxIdleConns:        16,
+		MaxIdleConnsPerHost: 12,
+		IdleConnTimeout:     90 * time.Second,
+		TLSHandshakeTimeout: 400 * time.Millisecond,
+	},
+}
+
 func fetchAd(cfg *Config, cmd string) Ad {
-	client := &http.Client{Timeout: 800 * time.Millisecond}
 	u := fmt.Sprintf("%s/api/serve?cmd=%s&d=%s", cfg.APIBase, url.QueryEscape(cmd), cfg.DeviceID)
-	if resp, err := client.Get(u); err == nil {
+	if resp, err := httpClient.Get(u); err == nil {
 		defer resp.Body.Close()
 		var ad Ad
 		if json.NewDecoder(resp.Body).Decode(&ad) == nil && ad.ID != "" && ad.Text != "" {
@@ -45,6 +58,23 @@ func fetchAd(cfg *Config, cmd string) Ad {
 		}
 	}
 	return houseAds[rand.Intn(len(houseAds))]
+}
+
+// fetchAdsConcurrent fires count fetchAd calls in parallel against the shared
+// httpClient and returns the results. Order is not meaningful; callers dedupe.
+func fetchAdsConcurrent(cfg *Config, cmd string, count int) []Ad {
+	ads := make([]Ad, count)
+	var wg sync.WaitGroup
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			ads[i] = fetchAd(cfg, cmd)
+		}()
+	}
+	wg.Wait()
+	return ads
 }
 
 // Server-supplied strings end up inside OSC 8 escape sequences; strip C0, DEL,

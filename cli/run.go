@@ -60,21 +60,15 @@ func runWrapped(args []string) int {
 	if isDbtRunFamily(args) {
 		return runDbtProgress(cfg, bin, args)
 	}
-	if isInstallCommand(args) {
-		exit := runPlain(bin, args)
-		if exit == 0 {
-			ad := fetchAd(cfg, args[0])
-			if ad.ID != "" {
-				fmt.Fprint(os.Stdout, completionAdLine(cfg, ad))
-				reportImpression(cfg, ad, args[0], minBillableSeconds)
-			}
-		}
-		return exit
-	}
-	if isNpmFamily(args) {
+	// Interactive / full-screen commands run plain: collapsing their output
+	// would hide prompts and look like a hang. Plain adds no extra line either.
+	if isInteractiveCommand(args) {
 		return runPlain(bin, args)
 	}
-	exit, ad, secs := runWithFooter(cfg, bin, args)
+	// Everything else (cargo, docker build, make, terraform plan, npm/pnpm/yarn/bun,
+	// pip, go, …) collapses into a single in-place line that rotates ads,
+	// trending content, and the earnings tally. No reserved footer row anywhere.
+	exit, ad, secs := runCollapsed(cfg, bin, args)
 	if isScaffoldCommand(args) && exit == 0 && ad.ID != "" {
 		fmt.Fprint(os.Stdout, completionAdLine(cfg, ad))
 		if secs < minBillableSeconds {
