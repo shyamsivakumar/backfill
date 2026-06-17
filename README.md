@@ -6,7 +6,7 @@
 
 ![bf on a real dbt run — the footer holds the bottom row while models build](assets/dbt-real.gif)
 
-*A real `dbt run` under `bf`: the output scrolls, the sponsored line stays pinned to the bottom row the whole run, summary and exit code intact.*
+*A real `dbt run` under `bf`: the per-model `START`/`OK` noise collapses into one live line that carries the ad, with the header and `PASS/WARN/ERROR` summary intact.*
 
 ## Quickstart
 
