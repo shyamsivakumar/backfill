@@ -4,7 +4,7 @@
 
 [![release](https://img.shields.io/github/v/release/shyamsivakumar/backfill)](https://github.com/shyamsivakumar/backfill/releases) [![PyPI](https://img.shields.io/pypi/v/backfill-cli)](https://pypi.org/project/backfill-cli/) [![license](https://img.shields.io/github/license/shyamsivakumar/backfill)](LICENSE)
 
-![bf on a real dbt run — the footer holds the bottom row while models build](assets/dbt-real.gif)
+![bf on a real dbt run: per-model output collapses into one live line carrying the ad](assets/dbt.gif)
 
 *A real `dbt run` under `bf`: the per-model `START`/`OK` noise collapses into one live line that carries the ad, with the header and `PASS/WARN/ERROR` summary intact.*
 

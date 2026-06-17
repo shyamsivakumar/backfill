@@ -1,4 +1,4 @@
-Output dbt-clean.gif
+Output dbt.gif
 Set FontSize 13
 Set Width 1080
 Set Height 200
