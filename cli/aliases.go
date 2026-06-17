@@ -215,6 +215,58 @@ func stripBlock(s string) string {
 	return s
 }
 
+// detectShadowingManagers returns version managers whose init appears after the
+// backfill block in a shell rc. They re-prepend their own bin to PATH, so a
+// backfill shim for a command they manage (npm, node, python, …) never fires.
+func detectShadowingManagers(rcPaths []string) []string {
+	type manager struct {
+		name    string
+		markers []string
+	}
+	managers := []manager{
+		{"nvm", []string{"nvm.sh", "nvm_dir"}},
+		{"fnm", []string{"fnm env", "fnm "}},
+		{"volta", []string{"volta_home", "volta "}},
+		{"asdf", []string{"asdf.sh", "asdf activate", ".asdf"}},
+		{"mise", []string{"mise activate"}},
+		{"pyenv", []string{"pyenv init"}},
+		{"rbenv", []string{"rbenv init"}},
+		{"nodenv", []string{"nodenv init"}},
+		{"n", []string{"n_prefix"}},
+		{"nodebrew", []string{"nodebrew"}},
+	}
+
+	found := map[string]bool{}
+	for _, p := range rcPaths {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		s := string(b)
+		i := strings.Index(s, blockStart)
+		if i == -1 {
+			continue
+		}
+		after := strings.ToLower(s[i+len(blockStart):])
+		for _, m := range managers {
+			for _, marker := range m.markers {
+				if strings.Contains(after, marker) {
+					found[m.name] = true
+					break
+				}
+			}
+		}
+	}
+
+	var out []string
+	for _, m := range managers {
+		if found[m.name] {
+			out = append(out, m.name)
+		}
+	}
+	return out
+}
+
 func cmdInit(extra []string, all bool) int {
 	cfg := loadConfig()
 	var list []string
@@ -249,6 +301,19 @@ func cmdInit(extra []string, all bool) int {
 	}
 	fmt.Printf("backfill set up %d commands in %s — restart your shell or run: source ~/%s\n",
 		len(list), strings.Join(changed, ", "), changed[0])
+
+	home, _ := os.UserHomeDir()
+	var rcPaths []string
+	for _, name := range changed {
+		rcPaths = append(rcPaths, filepath.Join(home, name))
+	}
+	if managers := detectShadowingManagers(rcPaths); len(managers) > 0 {
+		fmt.Printf("\nwarning: %s initialize after backfill in your shell rc and re-prepend PATH.\n", strings.Join(managers, ", "))
+		fmt.Println("Commands they manage (npm, node, yarn, pnpm, bun, python, pip, ruby) may not route through backfill.")
+		fmt.Println("Fix: move the backfill PATH line to the END of the rc, after the manager's setup:")
+		fmt.Println("  export PATH=\"$HOME/.backfill/shims:$PATH\"")
+	}
+
 	return 0
 }
 

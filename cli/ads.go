@@ -14,17 +14,18 @@ import (
 )
 
 type Ad struct {
-	ID          string `json:"id"`
-	Text        string `json:"text"`
-	URL         string `json:"url"`
-	SpinnerText string `json:"spinnerText"`
+	ID           string `json:"id"`
+	Text         string `json:"text"`
+	URL          string `json:"url"`
+	SpinnerText  string `json:"spinnerText"`
+	EarnedMicros int64  `json:"earnedMicros"`
 }
 
 // Shown when the ad server is unreachable. Preview slots — they never earn.
 var houseAds = []Ad{
-	{ID: "house_advertise", Text: "Your ad here — reach data engineers while their pipelines run", URL: "/advertise", SpinnerText: "your tool here · backfill"},
+	{ID: "house_advertise", Text: "Your ad here · reach data engineers while their pipelines run", URL: "/advertise", SpinnerText: "your tool here · backfill"},
 	{ID: "house_earn", Text: "This footer pays you. Sign in at backfill to start accruing", URL: "/", SpinnerText: "backfill · you keep half"},
-	{ID: "house_duckdb", Text: "House pick: DuckDB — in-process OLAP that eats parquet for breakfast", URL: "/r-ext/duckdb", SpinnerText: "DuckDB · in-process OLAP"},
+	{ID: "house_duckdb", Text: "House pick: DuckDB · in-process OLAP that eats parquet for breakfast", URL: "/r-ext/duckdb", SpinnerText: "DuckDB · in-process OLAP"},
 }
 
 var registerDeviceOnce sync.Once

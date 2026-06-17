@@ -278,9 +278,20 @@ func (f *footer) draw(out io.Writer) {
 	if f.alt {
 		return
 	}
+	earn := ""
+	if f.ad.EarnedMicros > 0 {
+		earn = fmt.Sprintf("$%.2f earned", float64(f.ad.EarnedMicros)/1e6)
+	}
 	max := f.cols - 4
+	if earn != "" {
+		max = f.cols - 4 - len(earn) - 2
+	}
 	if max < 12 {
-		return
+		earn = ""
+		max = f.cols - 4
+		if max < 12 {
+			return
+		}
 	}
 	text := []rune(f.ad.Text)
 	if len(text) > max {
@@ -290,4 +301,7 @@ func (f *footer) draw(out io.Writer) {
 	fmt.Fprintf(out,
 		"\x1b7\x1b[%d;1H\x1b[2K\x1b[2mad\x1b[0m \x1b]8;;%s\x07\x1b[33m%s\x1b[0m\x1b]8;;\x07\x1b8",
 		f.rows, link, string(text))
+	if earn != "" {
+		fmt.Fprintf(out, "\x1b7\x1b[%d;%dH\x1b[2m%s\x1b[0m\x1b8", f.rows, f.cols-len(earn)+1, earn)
+	}
 }
