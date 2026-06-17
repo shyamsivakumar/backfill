@@ -201,37 +201,14 @@ No args, no paths, no filenames, no env, no stdout or stderr contents. The sourc
 
 ## Advertiser side
 
-The web app is a Next.js (App Router) project on Drizzle + Neon Postgres.
+Advertisers self-serve through the portal at [backfill.sh/advertiser](https://backfill.sh/advertiser):
 
-### Routes
+- Sign in with a magic link, email only, no password.
+- Prepay an ad budget with a Stripe deposit.
+- Submit a campaign: ad text, an https link, a CPM, and optional command targeting (e.g. only on `dbt` runs).
+- Every campaign is reviewed and approved before it serves. You only pay for verified impression and click time, billed against your deposit.
 
-| Route | What |
-|---|---|
-| `/` | Landing page with the demo gif and the install one-liner |
-| `/advertise` | Advertiser pitch page |
-| `/advertiser` | Advertiser portal (auth-gated) |
-| `/dashboard` | Per-device earnings dashboard (auth-gated) |
-| `/login` | Magic-link auth (email only, no password) |
-| `/stats` | Public stats page |
-| `/dbt`, `/cargo`, `/terraform`, `/xcode`, `/claude-code`, `/codex`, `/ml-training`, `/vs` | Comparison / SEO pages |
-
-### APIs
-
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/serve` | eCPM ad selection for a given device/command, frequency-capped and flight-gated |
-| `POST /api/events` | Impression / click / visible-seconds events from `bf` |
-| `POST /api/device/register` | Device registration / first-run handshake |
-| `GET /api/balance` | Per-device balance for the dashboard |
-| `GET, POST /api/postback` | Affiliate conversion postback |
-| `POST /api/refer` | Referral attribution |
-| `GET /api/stats` | Aggregate stats for the public stats page |
-| `POST /api/admin/ads` | Admin actions (approve / toggle campaigns) |
-| `POST /api/advertiser/account` | Advertiser account create/update |
-| `POST /api/advertiser/campaign` | Campaign create/update (status `pending` until admin-approved) |
-| `POST /api/advertiser/deposit` | Prepay Stripe deposit against the account |
-| `POST /api/stripe/webhook` | Stripe checkout + webhook |
-| `GET /api/cron/recompute-ecpm` | Nightly Bayesian-shrinkage eCPM recompute across campaigns |
+*Portal screenshots coming.*
 
 ### Ad selection
 
