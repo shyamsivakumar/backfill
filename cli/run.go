@@ -60,7 +60,14 @@ func runWrapped(args []string) int {
 	if isDbtRunFamily(args) {
 		return runDbtProgress(cfg, bin, args)
 	}
-	return runWithFooter(cfg, bin, args)
+	exit, ad, secs := runWithFooter(cfg, bin, args)
+	if isScaffoldCommand(args) && exit == 0 && ad.ID != "" {
+		fmt.Fprint(os.Stdout, completionAdLine(cfg, ad))
+		if secs < minBillableSeconds {
+			reportImpression(cfg, ad, args[0], minBillableSeconds)
+		}
+	}
+	return exit
 }
 
 func runPlain(bin string, args []string) int {
@@ -74,16 +81,17 @@ func runPlain(bin string, args []string) int {
 
 // runWithFooter gives the child a PTY one row shorter than the terminal,
 // pins the scroll region to those rows, and owns the last row for the ad.
-func runWithFooter(cfg *Config, bin string, args []string) int {
+// It returns the exit code, the ad that was shown, and the billable seconds.
+func runWithFooter(cfg *Config, bin string, args []string) (int, Ad, int) {
 	cols, rows, err := termSize()
 	if err != nil || rows < 5 {
-		return runPlain(bin, args)
+		return runPlain(bin, args), Ad{}, 0
 	}
 
 	cmd := exec.Command(bin, args[1:]...)
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: uint16(rows - 1), Cols: uint16(cols)})
 	if err != nil {
-		return runPlain(bin, args)
+		return runPlain(bin, args), Ad{}, 0
 	}
 	defer ptmx.Close()
 
@@ -224,7 +232,7 @@ func runWithFooter(cfg *Config, bin string, args []string) int {
 	if secs >= minBillableSeconds {
 		reportImpression(cfg, f.ad, args[0], secs)
 	}
-	return exit
+	return exit, f.ad, secs
 }
 
 func commandExitCode(err error) int {

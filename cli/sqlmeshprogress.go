@@ -44,7 +44,8 @@ func isSqlmeshRunFamily(args []string) bool {
 // back to the footer wrapper when stdout is not a TTY (CI, pipes).
 func runSqlmeshProgress(cfg *Config, bin string, args []string) int {
 	if !cfg.Enabled || !term.IsTerminal(int(os.Stdout.Fd())) {
-		return runWithFooter(cfg, bin, args)
+		exit, _, _ := runWithFooter(cfg, bin, args)
+		return exit
 	}
 
 	pr, pw, err := os.Pipe()

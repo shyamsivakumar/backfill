@@ -58,7 +58,8 @@ func baseName(p string) string {
 // is not a TTY (CI, pipes) so scripted runs are untouched.
 func runDbtProgress(cfg *Config, bin string, args []string) int {
 	if !cfg.Enabled || !term.IsTerminal(int(os.Stdout.Fd())) {
-		return runWithFooter(cfg, bin, args)
+		exit, _, _ := runWithFooter(cfg, bin, args)
+		return exit
 	}
 
 	pr, pw, err := os.Pipe()
