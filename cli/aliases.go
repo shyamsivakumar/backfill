@@ -243,11 +243,11 @@ func detectShadowingManagers(rcPaths []string) []string {
 			continue
 		}
 		s := string(b)
-		i := strings.Index(s, blockStart)
-		if i == -1 {
+		end := strings.Index(s, blockEnd)
+		if end == -1 {
 			continue
 		}
-		after := strings.ToLower(s[i+len(blockStart):])
+		after := strings.ToLower(s[end+len(blockEnd):])
 		for _, m := range managers {
 			for _, marker := range m.markers {
 				if strings.Contains(after, marker) {
