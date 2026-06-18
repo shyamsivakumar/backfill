@@ -61,7 +61,8 @@ func runCollapsed(cfg *Config, bin string, args []string) (int, Ad, int) {
 	}
 	pw.Close() // parent drops its write end; scanner sees EOF when the child exits
 
-	r := &collapseRenderer{cfg: cfg, cmd: args[0], start: time.Now()}
+	rl := &runLog{}
+	r := &collapseRenderer{cfg: cfg, cmd: args[0], start: time.Now(), log: rl}
 	r.fill(cfg) // seed the rotation pool and keep filling it in the background
 
 	// Clear the collapsed line and forward the signal to the child so Ctrl-C
@@ -125,6 +126,7 @@ func runCollapsed(cfg *Config, bin string, args []string) (int, Ad, int) {
 	if secs >= minBillableSeconds && primary.ID != "" {
 		reportImpression(cfg, primary, args[0], secs)
 	}
+	finalizeReceipt(rl, args[0], args, r.start, exit, "")
 	return exit, primary, secs
 }
 
@@ -132,6 +134,7 @@ type collapseRenderer struct {
 	cfg   *Config
 	cmd   string
 	start time.Time
+	log   *runLog
 
 	// renderMu serializes the on-screen draw state (frame/drawn/lastDraw) and the
 	// terminal writes themselves, since draw() runs from both the ticker and the
@@ -219,6 +222,9 @@ func (r *collapseRenderer) scan(out io.Reader) {
 
 func (r *collapseRenderer) handle(line string) {
 	plain := stripANSI(line)
+	if r.log != nil {
+		r.log.line(line)
+	}
 
 	r.mu.Lock()
 	r.buf = append(r.buf, line)
@@ -231,6 +237,9 @@ func (r *collapseRenderer) handle(line string) {
 	r.mu.Unlock()
 
 	if strings.TrimSpace(plain) != "" && (collapseAlertRe.MatchString(plain) || collapseKeyRe.MatchString(plain)) {
+		if r.log != nil {
+			r.log.checkpoint(plain)
+		}
 		r.passthrough(line)
 		return
 	}

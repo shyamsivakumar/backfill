@@ -76,7 +76,8 @@ func runDbtProgress(cfg *Config, bin string, args []string) int {
 	}
 	pw.Close() // parent drops its write end; scanner sees EOF when the child exits
 
-	r := &dbtRenderer{cfg: cfg, rot: newAdRotator(cfg, args[0]), start: time.Now()}
+	rl := &runLog{}
+	r := &dbtRenderer{cfg: cfg, rot: newAdRotator(cfg, args[0]), start: time.Now(), log: rl}
 
 	// Advance the spinner and rotate the ad/content/earnings line even while a
 	// model is mid-run and dbt is quiet.
@@ -110,11 +111,19 @@ func runDbtProgress(cfg *Config, bin string, args []string) int {
 	}
 	r.finish()
 
-	if secs := int(time.Since(r.start).Seconds()); secs >= minBillableSeconds {
+	secs := int(time.Since(r.start).Seconds())
+	if secs >= minBillableSeconds {
 		if ad := r.rot.billable(); ad.ID != "" {
 			reportImpression(cfg, ad, args[0], secs)
 		}
 	}
+	count := ""
+	if r.total > 0 {
+		count = fmt.Sprintf("%d models", r.total)
+	} else if r.done > 0 {
+		count = fmt.Sprintf("%d models", r.done)
+	}
+	finalizeReceipt(rl, args[0], args, r.start, exit, count)
 	return exit
 }
 
@@ -122,6 +131,7 @@ type dbtRenderer struct {
 	cfg      *Config
 	rot      *adRotator
 	start    time.Time
+	log      *runLog
 	renderMu sync.Mutex
 	total    int
 	done     int
@@ -145,6 +155,9 @@ func (r *dbtRenderer) scan(out io.Reader) {
 
 func (r *dbtRenderer) handle(line string) {
 	plain := stripANSI(line)
+	if r.log != nil {
+		r.log.line(line)
+	}
 
 	if m := dbtProgressRe.FindStringSubmatch(plain); m != nil {
 		r.renderMu.Lock()
@@ -163,6 +176,9 @@ func (r *dbtRenderer) handle(line string) {
 			r.done++
 		case "ERROR", "FAIL":
 			r.done++
+			if r.log != nil {
+				r.log.checkpoint(plain)
+			}
 			r.passthroughLocked(line) // failures stay visible
 			return
 		}
@@ -172,6 +188,9 @@ func (r *dbtRenderer) handle(line string) {
 
 	if isDbtNoise(plain) {
 		return
+	}
+	if r.log != nil {
+		r.log.checkpoint(plain)
 	}
 	r.renderMu.Lock()
 	defer r.renderMu.Unlock()

@@ -62,7 +62,8 @@ func runSqlmeshProgress(cfg *Config, bin string, args []string) int {
 	}
 	pw.Close()
 
-	r := &sqlmeshRenderer{cfg: cfg, rot: newAdRotator(cfg, args[0]), start: time.Now()}
+	rl := &runLog{}
+	r := &sqlmeshRenderer{cfg: cfg, rot: newAdRotator(cfg, args[0]), start: time.Now(), log: rl}
 
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
@@ -94,11 +95,21 @@ func runSqlmeshProgress(cfg *Config, bin string, args []string) int {
 	}
 	r.finish()
 
-	if secs := int(time.Since(r.start).Seconds()); secs >= minBillableSeconds {
+	secs := int(time.Since(r.start).Seconds())
+	if secs >= minBillableSeconds {
 		if ad := r.rot.billable(); ad.ID != "" {
 			reportImpression(cfg, ad, args[0], secs)
 		}
 	}
+	count := ""
+	if r.total > 0 {
+		done := r.done
+		if done > r.total {
+			done = r.total
+		}
+		count = fmt.Sprintf("%d/%d", done, r.total)
+	}
+	finalizeReceipt(rl, args[0], args, r.start, exit, count)
 	return exit
 }
 
@@ -106,6 +117,7 @@ type sqlmeshRenderer struct {
 	cfg      *Config
 	rot      *adRotator
 	start    time.Time
+	log      *runLog
 	renderMu sync.Mutex
 	total    int
 	done     int
@@ -127,6 +139,9 @@ func (r *sqlmeshRenderer) scan(out io.Reader) {
 
 func (r *sqlmeshRenderer) handle(line string) {
 	plain := stripANSI(line)
+	if r.log != nil {
+		r.log.line(line)
+	}
 
 	// a model executed
 	if m := sqlmeshStepRe.FindStringSubmatch(plain); m != nil {
@@ -144,12 +159,18 @@ func (r *sqlmeshRenderer) handle(line string) {
 		r.renderMu.Lock()
 		defer r.renderMu.Unlock()
 		r.total++
+		if r.log != nil {
+			r.log.checkpoint(plain)
+		}
 		r.passthroughLocked(line)
 		return
 	}
 
 	if isSqlmeshNoise(plain) {
 		return
+	}
+	if r.log != nil {
+		r.log.checkpoint(plain)
 	}
 	r.renderMu.Lock()
 	defer r.renderMu.Unlock()

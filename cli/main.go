@@ -43,6 +43,10 @@ func main() {
 		cmdStatus()
 	case "claim":
 		cmdClaim()
+	case "last":
+		cmdLast()
+	case "logs":
+		cmdLogs(args[1:])
 	case "refer":
 		cmdRefer()
 	case "statusline":
@@ -88,6 +92,8 @@ usage:
   bf on | off              enable/disable backfill
   bf status                show device id and dashboard link
   bf claim                 print your device claim code
+  bf last                  show the last build receipt
+  bf logs last             print the last captured build log
   bf refer                 print your referral install command
   bf agents install        install the coding-agent spinner integration (claude, droid, codex)
   bf agents remove         remove the coding-agent spinner integration

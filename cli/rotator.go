@@ -65,10 +65,13 @@ const estCPMMicros = 20_000_000
 // meterText renders the live, always-on earnings meter shown on a wrapped run.
 // 1 impression = 5 visible seconds; the publisher keeps USER_SHARE of the eCPM.
 // It is an estimate at developer rates until real ads pay out, hence the "~".
-func meterText(elapsed time.Duration) string {
+func estimatedEarnedMicros(elapsed time.Duration) int64 {
 	impressions := elapsed.Seconds() / 5.0
-	micros := impressions * (estCPMMicros / 1000.0) * 0.5
-	return fmt.Sprintf("~$%.4f", micros/1e6)
+	return int64(impressions * (estCPMMicros / 1000.0) * 0.5)
+}
+
+func meterText(elapsed time.Duration) string {
+	return fmt.Sprintf("~$%.4f", float64(estimatedEarnedMicros(elapsed))/1e6)
 }
 
 // slotLabel returns the prefix and ANSI color for a rotation item so the user
