@@ -47,7 +47,7 @@ brews:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: https://backfill.sh
-    description: Sponsored footer for long-running CLI commands
+    description: Get paid while long CLI commands and coding agents run
     license: MIT
     install: |
       bin.install "bf"

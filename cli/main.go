@@ -79,20 +79,19 @@ func usage() {
 	fmt.Print(`bf — get paid while your builds run
 
 usage:
-  bf <command> [args...]   run a command with a sponsored footer (e.g. bf dbt run)
+  bf <command> [args...]   run a command and earn from the wait (e.g. bf dbt run)
   bf init [cmd...]         wrap common slow commands (dbt, cargo, docker, …) so they earn (one time)
   bf init --all            wrap every non-interactive command found on PATH
   bf uninit                remove the wrapping
   bf wrap <cmd>...         also wrap these commands
   bf unwrap <cmd>...       stop wrapping these commands
-  bf on | off              enable/disable the footer
+  bf on | off              enable/disable backfill
   bf status                show device id and dashboard link
   bf claim                 print your device claim code
   bf refer                 print your referral install command
-  bf statusline            print an agent status line ad
-  bf agents install        install agent status line integrations
-  bf agents remove         remove agent status line integrations
-  bf agents status         show agent status line integration status
+  bf agents install        install the coding-agent spinner integration (claude, droid, codex)
+  bf agents remove         remove the coding-agent spinner integration
+  bf agents status         show coding-agent spinner integration status
 `)
 }
 

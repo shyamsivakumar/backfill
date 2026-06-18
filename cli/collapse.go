@@ -351,6 +351,14 @@ func isInteractiveCommand(args []string) bool {
 				return true
 			}
 		}
+	case "npm", "pnpm", "yarn", "bun":
+		// install/ci/build/test collapse fine; init/login/publish prompt.
+		for _, a := range args[1:] {
+			switch a {
+			case "init", "create", "login", "adduser", "publish", "logout", "link":
+				return true
+			}
+		}
 	}
 	return false
 }
