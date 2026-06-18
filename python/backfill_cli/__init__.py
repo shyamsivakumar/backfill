@@ -103,10 +103,43 @@ def _resign_macos(binary):
         pass
 
 
-def _download(binary):
+def _prune_old_binaries(base, keep):
+    # Remove stale bf-<version> binaries from prior upgrades; keep the current one.
+    try:
+        for entry in base.iterdir():
+            if entry.name != keep and (
+                entry.name == "bf" or entry.name.startswith("bf-")
+            ):
+                try:
+                    entry.unlink()
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
+def _wheel_version():
+    # The published wheel's version equals the release tag (publish-pypi syncs it),
+    # so we can fetch the exact matching binary and key the cache to it. Returns
+    # None when running from source, where there is no installed distribution.
+    try:
+        from importlib.metadata import version, PackageNotFoundError
+
+        try:
+            return version("backfill-cli")
+        except PackageNotFoundError:
+            return None
+    except Exception:
+        return None
+
+
+def _download(binary, release_version=None):
     os_name, arch = _target()
     archive_name = f"backfill_{os_name}_{arch}.tar.gz"
-    url = f"https://github.com/shyamsivakumar/backfill/releases/latest/download/{archive_name}"
+    if release_version:
+        url = f"https://github.com/shyamsivakumar/backfill/releases/download/v{release_version}/{archive_name}"
+    else:
+        url = f"https://github.com/shyamsivakumar/backfill/releases/latest/download/{archive_name}"
     expected_sha256 = _read_expected_sha256(url, archive_name)
     binary.parent.mkdir(parents=True, exist_ok=True)
 
@@ -331,10 +364,16 @@ def main():
     if sys.platform == "win32":
         _fail("backfill does not support Windows yet")
 
-    binary = Path.home() / ".local" / "share" / "backfill" / "bf"
+    # Key the cached binary to the wheel version so `pip install -U backfill-cli`
+    # fetches the matching new binary instead of reusing a stale one forever. From
+    # source (no installed version) fall back to a single "bf" + the latest release.
+    base = Path.home() / ".local" / "share" / "backfill"
+    release_version = _wheel_version()
+    binary = base / (f"bf-{release_version}" if release_version else "bf")
 
     if not (binary.exists() and os.access(str(binary), os.X_OK)):
-        _download(binary)
+        _download(binary, release_version=release_version)
+        _prune_old_binaries(base, keep=binary.name)
 
     _ensure_on_path()
 
