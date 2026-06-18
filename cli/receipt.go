@@ -137,6 +137,7 @@ func finalizeReceipt(rl *runLog, cmd string, args []string, start time.Time, exi
 	_ = os.WriteFile(filepath.Join(dir, "last-run.log"), log, 0o600)
 
 	printReceiptLine(rec)
+	notifyDone(rec)
 }
 
 // printReceiptLine prints the one-line end-of-run receipt: a colored status, the
