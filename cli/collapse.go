@@ -20,6 +20,24 @@ import (
 // never silent. Empty / whitespace-only lines are not alerts.
 var collapseAlertRe = regexp.MustCompile(`(?i)\b(error|errors|failed|failure|fatal|panic|cannot|unable|exception|denied|refused|traceback)\b`)
 
+// collapseKeyRe matches the FEW milestone / summary lines worth surfacing from a
+// long build, so a collapsed run still shows its key checkpoints and final
+// summary instead of hiding everything behind the ad line. Anchored at line
+// start (after ANSI strip) and curated per tool, so it surfaces phase markers,
+// not per-file compiler spam.
+// Patterns are deliberately limited to bounded phase markers (docker steps,
+// per-package test results) and terminal summaries — NOT per-unit progress like
+// cargo's per-crate "Compiling", webpack's per-module "building", or gradle's
+// per-task "> Task", which would flood and defeat the collapse. Completion words
+// are anchored to end-of-line so they only match a summary line, not a sentence.
+var collapseKeyRe = regexp.MustCompile(`(?i)` +
+	`^\s*(finished |successfully built|successfully tagged|` + // cargo / docker result
+	`step \d+/\d+|#\d+ (done|cached)\b|` + // docker classic + buildkit per-layer completion (bounded)
+	`ok\s+\S|--- (fail|pass)|no test files|\d+ (passed|failed)\b|` + // go / pytest results
+	`build (successful|failed|complete|completed)\b|` + // gradle / generic
+	`\[info\] building |successfully installed|resolved \d+ package)` + // maven / pip
+	`|^(done|success|completed)\s*$`) // bare completion line
+
 // How long each item (ad, trending content, earnings) holds the collapsed line
 // before the next one rotates in.
 const collapseRotateSeconds = 6
@@ -220,7 +238,7 @@ func (r *collapseRenderer) handle(line string) {
 	}
 	r.mu.Unlock()
 
-	if strings.TrimSpace(plain) != "" && collapseAlertRe.MatchString(plain) {
+	if strings.TrimSpace(plain) != "" && (collapseAlertRe.MatchString(plain) || collapseKeyRe.MatchString(plain)) {
 		r.passthrough(line)
 		return
 	}
