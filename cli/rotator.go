@@ -104,7 +104,12 @@ func composeLine(leftPlain string, elapsed time.Duration, item Ad, link string) 
 	}
 
 	label, color := slotLabel(item.ID)
-	prefix := label + " · "
+	// Distinguish by COLOR, not a word: only paid ads carry the "ad · " prefix
+	// (disclosure); trending/hn/tip content is just shown in its own color.
+	prefix := ""
+	if label == "ad" {
+		prefix = "ad · "
+	}
 	// reserved width: leftPlain + " · " + meter + "  " + prefix
 	used := visibleLen(leftPlain) + 3 + visibleLen(meter) + 2 + len(prefix)
 	runes := []rune(item.Text)
