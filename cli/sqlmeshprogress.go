@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -123,11 +122,7 @@ func (r *sqlmeshRenderer) started() bool {
 }
 
 func (r *sqlmeshRenderer) scan(out io.Reader) {
-	sc := bufio.NewScanner(out)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
-	for sc.Scan() {
-		r.handle(sc.Text())
-	}
+	drainLines(out, r.handle)
 }
 
 func (r *sqlmeshRenderer) handle(line string) {

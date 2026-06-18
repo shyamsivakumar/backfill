@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -205,11 +204,7 @@ func (r *collapseRenderer) tail() []string {
 }
 
 func (r *collapseRenderer) scan(out io.Reader) {
-	sc := bufio.NewScanner(out)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
-	for sc.Scan() {
-		r.handle(sc.Text())
-	}
+	drainLines(out, r.handle)
 }
 
 func (r *collapseRenderer) handle(line string) {
@@ -333,8 +328,21 @@ func isInteractiveCommand(args []string) bool {
 	switch args[0] {
 	case "vim", "vi", "nvim", "nano", "emacs", "less", "more", "top", "htop", "btop",
 		"ssh", "sudo", "gh", "aws", "gcloud", "heroku", "kubectl",
+		"firebase", "supabase", "vercel", "netlify", "fly", "flyctl", "railway",
+		"ipython", "jupyter", "mvn",
 		"psql", "mysql", "mongosh", "redis-cli", "sqlite3", "python", "python3", "node", "irb":
 		return true
+	case "git":
+		// interactive rebase, patch-add, conflict-resolving merges, editor commits.
+		for _, a := range args[1:] {
+			switch a {
+			case "rebase", "add", "commit", "merge", "cherry-pick", "revert", "stash", "bisect":
+				return true
+			}
+			if !strings.HasPrefix(a, "-") {
+				return false
+			}
+		}
 	case "terraform", "pulumi":
 		for _, a := range args[1:] {
 			switch a {
@@ -348,8 +356,18 @@ func isInteractiveCommand(args []string) bool {
 				return true
 			}
 		}
+	case "npx", "pnpx", "bunx":
+		// project scaffolders (create-next-app, create-vite, …) prompt interactively.
+		for _, a := range args[1:] {
+			if a == "create" || strings.HasPrefix(a, "create-") {
+				return true
+			}
+			if !strings.HasPrefix(a, "-") {
+				return false
+			}
+		}
 	case "npm", "pnpm", "yarn", "bun":
-		// install/ci/build/test collapse fine; init/login/publish prompt.
+		// install/ci/build/test collapse fine; init/create/login/publish prompt.
 		for _, a := range args[1:] {
 			switch a {
 			case "init", "create", "login", "adduser", "publish", "logout", "link":

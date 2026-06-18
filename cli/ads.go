@@ -101,13 +101,15 @@ func registerDevice(cfg *Config) {
 		"secretHash": hex.EncodeToString(sum[:]),
 	})
 
-	client := &http.Client{Timeout: 800 * time.Millisecond}
-	resp, err := client.Post(cfg.APIBase+"/api/device/register", "application/json", bytes.NewReader(body))
+	resp, err := httpClient.Post(cfg.APIBase+"/api/device/register", "application/json", bytes.NewReader(body))
 	if err == nil {
 		resp.Body.Close()
 	}
 }
 
+// reportImpression posts the impression on the shared client (800ms timeout) so
+// a slow or dead network can never freeze the shell prompt for seconds after a
+// wrapped command has already finished.
 func reportImpression(cfg *Config, ad Ad, cmd string, seconds int) {
 	registerDeviceOnce.Do(func() {
 		registerDevice(cfg)
@@ -120,8 +122,7 @@ func reportImpression(cfg *Config, ad Ad, cmd string, seconds int) {
 		"seconds":  seconds,
 		"kind":     "impression",
 	})
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Post(cfg.APIBase+"/api/events", "application/json", bytes.NewReader(body))
+	resp, err := httpClient.Post(cfg.APIBase+"/api/events", "application/json", bytes.NewReader(body))
 	if err == nil {
 		resp.Body.Close()
 	}

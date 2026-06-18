@@ -65,9 +65,24 @@ func runWrapped(args []string) int {
 	if isInteractiveCommand(args) {
 		return runPlain(bin, args)
 	}
-	// Everything else (cargo, docker build, make, terraform plan, npm/pnpm/yarn/bun,
-	// pip, go, …) collapses into a single in-place line that rotates ads,
-	// trending content, and the earnings tally. No reserved footer row anywhere.
+	// Package installs (npm/pnpm/yarn/bun/pip install) draw a TTY-only progress
+	// bar that goes SILENT on a pipe, so collapsing them looks frozen. Run them
+	// attached to the real terminal so their native progress shows, and put the
+	// sponsored line on the completion screen instead.
+	if isInstallCommand(args) {
+		exit := runPlain(bin, args)
+		if exit == 0 {
+			ad := fetchAd(cfg, args[0])
+			if ad.ID != "" {
+				fmt.Fprint(os.Stdout, completionAdLine(cfg, ad))
+				reportImpression(cfg, ad, args[0], minBillableSeconds)
+			}
+		}
+		return exit
+	}
+	// Everything else (cargo, docker build, make, terraform plan, go, …) collapses
+	// into a single in-place line that rotates ads, trending content, and the
+	// earnings tally. No reserved footer row anywhere.
 	exit, ad, secs := runCollapsed(cfg, bin, args)
 	if isScaffoldCommand(args) && exit == 0 && ad.ID != "" {
 		fmt.Fprint(os.Stdout, completionAdLine(cfg, ad))

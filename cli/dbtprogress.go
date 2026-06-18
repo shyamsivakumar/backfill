@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -141,12 +140,7 @@ func (r *dbtRenderer) started() bool {
 }
 
 func (r *dbtRenderer) scan(out io.Reader) {
-	sc := bufio.NewScanner(out)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
-	for sc.Scan() {
-		line := sc.Text()
-		r.handle(line)
-	}
+	drainLines(out, r.handle)
 }
 
 func (r *dbtRenderer) handle(line string) {
