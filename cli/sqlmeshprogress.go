@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/term"
@@ -62,9 +63,30 @@ func runSqlmeshProgress(cfg *Config, bin string, args []string) int {
 	}
 	pw.Close()
 
-	ad := fetchAd(cfg, args[0])
-	r := &sqlmeshRenderer{cfg: cfg, ad: ad, start: time.Now()}
+	r := &sqlmeshRenderer{cfg: cfg, rot: newAdRotator(cfg, args[0]), start: time.Now()}
+
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+				if r.started() {
+					r.draw()
+				}
+			}
+		}
+	}()
+
 	r.scan(pr)
+	close(stop)
+	wg.Wait()
 	pr.Close()
 
 	exit := 0
@@ -74,21 +96,30 @@ func runSqlmeshProgress(cfg *Config, bin string, args []string) int {
 	r.finish()
 
 	if secs := int(time.Since(r.start).Seconds()); secs >= minBillableSeconds {
-		reportImpression(cfg, ad, args[0], secs)
+		if ad := r.rot.billable(); ad.ID != "" {
+			reportImpression(cfg, ad, args[0], secs)
+		}
 	}
 	return exit
 }
 
 type sqlmeshRenderer struct {
 	cfg      *Config
-	ad       Ad
+	rot      *adRotator
 	start    time.Time
+	renderMu sync.Mutex
 	total    int
 	done     int
 	current  string
 	frame    int
 	drawn    bool
 	lastDraw time.Time
+}
+
+func (r *sqlmeshRenderer) started() bool {
+	r.renderMu.Lock()
+	defer r.renderMu.Unlock()
+	return r.total > 0 || r.done > 0
 }
 
 func (r *sqlmeshRenderer) scan(out io.Reader) {
@@ -104,38 +135,52 @@ func (r *sqlmeshRenderer) handle(line string) {
 
 	// a model executed
 	if m := sqlmeshStepRe.FindStringSubmatch(plain); m != nil {
+		r.renderMu.Lock()
+		defer r.renderMu.Unlock()
 		r.current = m[1]
 		r.done++
-		r.draw()
+		r.drawLocked()
 		return
 	}
 
 	// "* `model`: [...]" under "Models needing backfill:" — count toward the total
 	// and keep the line visible so the user sees what's being built.
 	if m := sqlmeshBackfillRe.FindStringSubmatch(plain); m != nil {
+		r.renderMu.Lock()
+		defer r.renderMu.Unlock()
 		r.total++
-		r.passthrough(line)
+		r.passthroughLocked(line)
 		return
 	}
 
 	if isSqlmeshNoise(plain) {
 		return
 	}
-	r.passthrough(line)
+	r.renderMu.Lock()
+	defer r.renderMu.Unlock()
+	r.passthroughLocked(line)
 }
 
-func (r *sqlmeshRenderer) passthrough(line string) {
+// passthroughLocked clears the live line, prints the real line, redraws. Caller holds renderMu.
+func (r *sqlmeshRenderer) passthroughLocked(line string) {
 	if r.drawn {
 		fmt.Fprint(os.Stdout, "\r\x1b[2K")
 		r.drawn = false
 	}
 	fmt.Fprintln(os.Stdout, line)
 	if r.total > 0 || r.done > 0 {
-		r.draw()
+		r.drawLocked()
 	}
 }
 
 func (r *sqlmeshRenderer) draw() {
+	r.renderMu.Lock()
+	defer r.renderMu.Unlock()
+	r.drawLocked()
+}
+
+// drawLocked renders the progress line. Caller holds renderMu.
+func (r *sqlmeshRenderer) drawLocked() {
 	now := time.Now()
 	if r.drawn && now.Sub(r.lastDraw) < 80*time.Millisecond {
 		return
@@ -160,9 +205,10 @@ func (r *sqlmeshRenderer) draw() {
 		left += "  " + r.current
 	}
 
-	adText := r.ad.Text
+	item := r.rot.current()
+	adText := item.Text
 	line := fmt.Sprintf("\x1b[2m%s\x1b[0m  \x1b]8;;%s\x07\x1b[33mad · %s\x1b[0m\x1b]8;;\x07",
-		left, r.adLink(), adText)
+		left, r.rot.link(item), adText)
 
 	if vis := visibleLen(left) + len("ad · ") + len([]rune(adText)) + 2; vis > cols {
 		line = fmt.Sprintf("\x1b[2m%s\x1b[0m  \x1b[33mad · %s\x1b[0m", left, adText)
@@ -172,11 +218,9 @@ func (r *sqlmeshRenderer) draw() {
 	r.drawn = true
 }
 
-func (r *sqlmeshRenderer) adLink() string {
-	return fmt.Sprintf("%s/r/%s?d=%s", r.cfg.APIBase, r.ad.ID, r.cfg.DeviceID)
-}
-
 func (r *sqlmeshRenderer) finish() {
+	r.renderMu.Lock()
+	defer r.renderMu.Unlock()
 	if r.drawn {
 		fmt.Fprint(os.Stdout, "\r\x1b[2K")
 		r.drawn = false

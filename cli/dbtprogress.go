@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/term"
@@ -76,9 +77,32 @@ func runDbtProgress(cfg *Config, bin string, args []string) int {
 	}
 	pw.Close() // parent drops its write end; scanner sees EOF when the child exits
 
-	ad := fetchAd(cfg, args[0])
-	r := &dbtRenderer{cfg: cfg, ad: ad, start: time.Now()}
+	r := &dbtRenderer{cfg: cfg, rot: newAdRotator(cfg, args[0]), start: time.Now()}
+
+	// Advance the spinner and rotate the ad/content/earnings line even while a
+	// model is mid-run and dbt is quiet.
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+				if r.started() {
+					r.draw()
+				}
+			}
+		}
+	}()
+
 	r.scan(pr)
+	close(stop)
+	wg.Wait()
 	pr.Close()
 
 	exit := 0
@@ -88,21 +112,32 @@ func runDbtProgress(cfg *Config, bin string, args []string) int {
 	r.finish()
 
 	if secs := int(time.Since(r.start).Seconds()); secs >= minBillableSeconds {
-		reportImpression(cfg, ad, args[0], secs)
+		if ad := r.rot.billable(); ad.ID != "" {
+			reportImpression(cfg, ad, args[0], secs)
+		}
 	}
 	return exit
 }
 
 type dbtRenderer struct {
 	cfg      *Config
-	ad       Ad
+	rot      *adRotator
 	start    time.Time
+	renderMu sync.Mutex
 	total    int
 	done     int
 	current  string
 	frame    int
 	drawn    bool
 	lastDraw time.Time
+}
+
+// started reports whether dbt has emitted a progress line yet, so the ticker
+// doesn't draw a bare ad line before the run header.
+func (r *dbtRenderer) started() bool {
+	r.renderMu.Lock()
+	defer r.renderMu.Unlock()
+	return r.total > 0
 }
 
 func (r *dbtRenderer) scan(out io.Reader) {
@@ -118,6 +153,8 @@ func (r *dbtRenderer) handle(line string) {
 	plain := stripANSI(line)
 
 	if m := dbtProgressRe.FindStringSubmatch(plain); m != nil {
+		r.renderMu.Lock()
+		defer r.renderMu.Unlock()
 		if total, err := strconv.Atoi(m[2]); err == nil {
 			r.total = total
 		}
@@ -132,33 +169,42 @@ func (r *dbtRenderer) handle(line string) {
 			r.done++
 		case "ERROR", "FAIL":
 			r.done++
-			r.passthrough(line) // failures stay visible
+			r.passthroughLocked(line) // failures stay visible
 			return
 		}
-		r.draw()
+		r.drawLocked()
 		return
 	}
 
 	if isDbtNoise(plain) {
 		return
 	}
-	r.passthrough(line)
+	r.renderMu.Lock()
+	defer r.renderMu.Unlock()
+	r.passthroughLocked(line)
 }
 
-// passthrough clears the live line, prints a real line (header, summary, error),
-// then redraws the progress line beneath it.
-func (r *dbtRenderer) passthrough(line string) {
+// passthroughLocked clears the live line, prints a real line (header, summary,
+// error), then redraws the progress line beneath it. Caller holds renderMu.
+func (r *dbtRenderer) passthroughLocked(line string) {
 	if r.drawn {
 		fmt.Fprint(os.Stdout, "\r\x1b[2K")
 		r.drawn = false
 	}
 	fmt.Fprintln(os.Stdout, line)
 	if r.total > 0 {
-		r.draw()
+		r.drawLocked()
 	}
 }
 
 func (r *dbtRenderer) draw() {
+	r.renderMu.Lock()
+	defer r.renderMu.Unlock()
+	r.drawLocked()
+}
+
+// drawLocked renders the progress line. Caller holds renderMu.
+func (r *dbtRenderer) drawLocked() {
 	now := time.Now()
 	if r.drawn && now.Sub(r.lastDraw) < 80*time.Millisecond {
 		return
@@ -177,9 +223,10 @@ func (r *dbtRenderer) draw() {
 	if cur != "" {
 		left += "  " + cur
 	}
-	adText := r.ad.Text
+	item := r.rot.current()
+	adText := item.Text
 	line := fmt.Sprintf("\x1b[2m%s\x1b[0m  \x1b]8;;%s\x07\x1b[33mad · %s\x1b[0m\x1b]8;;\x07",
-		left, r.adLink(), adText)
+		left, r.rot.link(item), adText)
 
 	if vis := visibleLen(left) + len("ad · ") + len([]rune(adText)) + 2; vis > cols {
 		line = fmt.Sprintf("\x1b[2m%s\x1b[0m  \x1b[33mad · %s\x1b[0m", left, adText)
@@ -189,11 +236,9 @@ func (r *dbtRenderer) draw() {
 	r.drawn = true
 }
 
-func (r *dbtRenderer) adLink() string {
-	return fmt.Sprintf("%s/r/%s?d=%s", r.cfg.APIBase, r.ad.ID, r.cfg.DeviceID)
-}
-
 func (r *dbtRenderer) finish() {
+	r.renderMu.Lock()
+	defer r.renderMu.Unlock()
 	if r.drawn {
 		fmt.Fprint(os.Stdout, "\r\x1b[2K")
 		r.drawn = false

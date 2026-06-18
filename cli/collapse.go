@@ -188,10 +188,7 @@ func (r *collapseRenderer) billable() (Ad, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, ad := range r.items {
-		if ad.ID == "" || ad.ID == "earnings" {
-			continue
-		}
-		if strings.HasPrefix(ad.ID, "gh_") || strings.HasPrefix(ad.ID, "hn_") {
+		if isHouseContentID(ad.ID) {
 			continue
 		}
 		return ad, true
