@@ -11,8 +11,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"golang.org/x/term"
 )
 
 // collapseAlertRe matches lines that look like an error or failure even after
@@ -177,13 +175,7 @@ func (r *collapseRenderer) fill(cfg *Config) {
 				r.items = append(r.items, ad)
 			}
 		}
-		if earned > 0 {
-			r.items = append(r.items, Ad{
-				ID:   "earnings",
-				Text: fmt.Sprintf("$%.2f earned · backfill", float64(earned)/1e6),
-				URL:  cfg.APIBase,
-			})
-		}
+		_ = earned
 	}()
 }
 
@@ -273,38 +265,10 @@ func (r *collapseRenderer) drawLocked() {
 	r.lastDraw = now
 	r.frame = (r.frame + 1) % len(dbtSpinFrames)
 
+	elapsed := time.Since(r.start)
+	left := fmt.Sprintf("%c %s · %s", dbtSpinFrames[r.frame], r.cmd, formatElapsed(elapsed))
 	item := r.current()
-	if item.ID == "" {
-		return
-	}
-
-	cols := 80
-	if c, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && c > 0 {
-		cols = c
-	}
-
-	left := fmt.Sprintf("%c %s · %s", dbtSpinFrames[r.frame], r.cmd, formatElapsed(time.Since(r.start)))
-	text := item.Text
-	if vis := visibleLen(left) + len("  ad · ") + len([]rune(text)); vis <= cols {
-		line := fmt.Sprintf("\x1b[2m%s\x1b[0m  \x1b]8;;%s\x07\x1b[33mad · %s\x1b[0m\x1b]8;;\x07",
-			left, r.link(item), text)
-		fmt.Fprint(os.Stdout, "\r\x1b[2K"+line)
-		r.drawn = true
-		return
-	}
-
-	max := cols - visibleLen(left) - len("  ad · ")
-	if max < 4 {
-		fmt.Fprint(os.Stdout, "\r\x1b[2K\x1b[2m"+left+"\x1b[0m")
-		r.drawn = true
-		return
-	}
-	runes := []rune(text)
-	if len(runes) > max {
-		runes = append(runes[:max-1], '…')
-	}
-	line := fmt.Sprintf("\x1b[2m%s\x1b[0m  \x1b[33mad · %s\x1b[0m", left, string(runes))
-	fmt.Fprint(os.Stdout, "\r\x1b[2K"+line)
+	fmt.Fprint(os.Stdout, composeLine(left, elapsed, item, r.link(item)))
 	r.drawn = true
 }
 

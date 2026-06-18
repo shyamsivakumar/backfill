@@ -206,27 +206,12 @@ func (r *dbtRenderer) drawLocked() {
 	r.lastDraw = now
 	r.frame = (r.frame + 1) % len(dbtSpinFrames)
 
-	cols := 80
-	if c, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && c > 0 {
-		cols = c
-	}
-
-	count := fmt.Sprintf("%d/%d", r.done, r.total)
-	cur := r.current
-	left := fmt.Sprintf("%c dbt %s", dbtSpinFrames[r.frame], count)
-	if cur != "" {
-		left += "  " + cur
+	left := fmt.Sprintf("%c dbt %d/%d", dbtSpinFrames[r.frame], r.done, r.total)
+	if r.current != "" {
+		left += "  " + r.current
 	}
 	item := r.rot.current()
-	adText := item.Text
-	line := fmt.Sprintf("\x1b[2m%s\x1b[0m  \x1b]8;;%s\x07\x1b[33mad · %s\x1b[0m\x1b]8;;\x07",
-		left, r.rot.link(item), adText)
-
-	if vis := visibleLen(left) + len("ad · ") + len([]rune(adText)) + 2; vis > cols {
-		line = fmt.Sprintf("\x1b[2m%s\x1b[0m  \x1b[33mad · %s\x1b[0m", left, adText)
-	}
-
-	fmt.Fprint(os.Stdout, "\r\x1b[2K"+line)
+	fmt.Fprint(os.Stdout, composeLine(left, time.Since(r.start), item, r.rot.link(item)))
 	r.drawn = true
 }
 
