@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mattn/go-runewidth"
 )
 
 func setSpinnerVerb(verbs []string) error {
@@ -54,24 +56,44 @@ func removeSpinnerVerb() error {
 	return writeClaudeSettingsAtomic(settings)
 }
 
+// Claude Code appends its own status — "(5s · ↓ 42 tokens · thinking …)" — after
+// the spinner verb, so a long verb pushes that status off the right edge where it
+// gets cut. Cap the verb (in terminal columns, so a CJK verb is held to the same
+// visible width) well short of a narrow 80-col line so the status fits.
+const maxSpinnerVerbCols = 28
+
 func spinnerVerbForAd(ad Ad) string {
-	if strings.TrimSpace(ad.SpinnerText) != "" {
-		return strings.TrimSpace(stripControlChars(ad.SpinnerText))
+	if v := capSpinnerVerb(stripControlChars(ad.SpinnerText)); v != "" {
+		return v
 	}
 
 	text := stripControlChars(ad.Text)
 	if before, _, ok := strings.Cut(text, " — "); ok {
-		return strings.TrimSpace(before)
+		if v := capSpinnerVerb(before); v != "" {
+			return v
+		}
 	}
 	if before, _, ok := strings.Cut(text, " - "); ok {
-		return strings.TrimSpace(before)
+		if v := capSpinnerVerb(before); v != "" {
+			return v
+		}
 	}
+	return capSpinnerVerb(text)
+}
 
-	runes := []rune(text)
-	if len(runes) > 40 {
-		runes = runes[:40]
+// capSpinnerVerb drops a trailing ellipsis the server already appended (but not a
+// lone period, so "etc." survives), then truncates to maxSpinnerVerbCols columns
+// with a single "…" so the verb plus Claude's status fit on one line.
+func capSpinnerVerb(s string) string {
+	s = strings.TrimSpace(s)
+	for {
+		t := strings.TrimRight(strings.TrimSuffix(strings.TrimSuffix(s, "…"), "..."), " ")
+		if t == s {
+			break
+		}
+		s = t
 	}
-	return strings.TrimSpace(string(runes))
+	return runewidth.Truncate(s, maxSpinnerVerbCols, "…")
 }
 
 // fetchSpinnerBatch collects up to n distinct spinner verbs for Claude Code by

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/mattn/go-runewidth"
 	"golang.org/x/term"
 )
 
@@ -316,15 +317,12 @@ func (f *footer) draw(out io.Writer) {
 			return
 		}
 	}
-	text := []rune(f.ad.Text)
-	if len(text) > max {
-		text = append(text[:max-1], '…')
-	}
+	text := runewidth.Truncate(f.ad.Text, max, "…")
 	link := fmt.Sprintf("%s/r/%s?d=%s", f.cfg.APIBase, f.ad.ID, f.cfg.DeviceID)
 	fmt.Fprintf(out,
 		"\x1b7\x1b[%d;1H\x1b[2K\x1b[2mad\x1b[0m \x1b]8;;%s\x07\x1b[33m%s\x1b[0m\x1b]8;;\x07\x1b8",
-		f.rows, link, string(text))
+		f.rows, link, text)
 	if earn != "" {
-		fmt.Fprintf(out, "\x1b7\x1b[%d;%dH\x1b[2m%s\x1b[0m\x1b8", f.rows, f.cols-len(earn)+1, earn)
+		fmt.Fprintf(out, "\x1b7\x1b[%d;%dH\x1b[2m%s\x1b[0m\x1b8", f.rows, f.cols-runewidth.StringWidth(earn)+1, earn)
 	}
 }

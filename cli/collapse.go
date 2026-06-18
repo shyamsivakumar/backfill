@@ -145,28 +145,24 @@ type collapseRenderer struct {
 	lastDraw time.Time
 
 	mu    sync.Mutex
-	items []Ad // rotation pool: ads + trending content (+ an earnings entry)
+	items []Ad // rotation pool: ads + trending content (earnings show in the meter)
 	buf   []string
 }
 
 // fill seeds the rotation with one ad synchronously (so the line has something
-// immediately) and fetches a few more plus the earnings entry in the
-// background, so starting the command is never blocked on the network.
+// immediately) and fetches a few more in the background, so starting the command
+// is never blocked on the network.
 func (r *collapseRenderer) fill(cfg *Config) {
 	first := fetchAd(cfg, r.cmd)
 	r.mu.Lock()
 	r.items = []Ad{first}
-	earned := first.EarnedMicros
 	r.mu.Unlock()
 
 	go func() {
-		ads := fetchAdsConcurrent(cfg, r.cmd, 4)
+		ads := fetchAdsConcurrent(cfg, r.cmd, poolFetchCount)
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		for _, ad := range ads {
-			if ad.EarnedMicros > earned {
-				earned = ad.EarnedMicros
-			}
 			dup := false
 			for _, existing := range r.items {
 				if existing.ID == ad.ID {
@@ -178,7 +174,6 @@ func (r *collapseRenderer) fill(cfg *Config) {
 				r.items = append(r.items, ad)
 			}
 		}
-		_ = earned
 	}()
 }
 

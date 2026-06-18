@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mattn/go-runewidth"
 	"golang.org/x/term"
 )
 
@@ -266,6 +267,8 @@ func stripANSI(s string) string {
 	return ansiRe.ReplaceAllString(s, "")
 }
 
+// visibleLen is the terminal column width of s after stripping ANSI, so layout
+// arithmetic stays correct for CJK / emoji ads that occupy two columns per rune.
 func visibleLen(s string) int {
-	return len([]rune(stripANSI(s)))
+	return runewidth.StringWidth(stripANSI(s))
 }

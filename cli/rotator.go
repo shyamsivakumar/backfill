@@ -7,11 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mattn/go-runewidth"
 	"golang.org/x/term"
 )
 
-// adRotator holds a small pool of served items (ads + trending content + an
-// earnings entry) and rotates which one is shown every collapseRotateSeconds.
+// adRotator holds a small pool of served items (ads + trending content) and
+// rotates which one is shown every collapseRotateSeconds.
 // It is shared by the collapsed-command, dbt, and sqlmesh renderers so every
 // surface cycles the same way. The pool is seeded with one item synchronously
 // and topped up in the background, so starting a command never blocks on the
@@ -30,17 +31,13 @@ func newAdRotator(cfg *Config, cmd string) *adRotator {
 	first := fetchAd(cfg, cmd)
 	r.mu.Lock()
 	r.items = []Ad{first}
-	earned := first.EarnedMicros
 	r.mu.Unlock()
 
 	go func() {
-		ads := fetchAdsConcurrent(cfg, cmd, 4)
+		ads := fetchAdsConcurrent(cfg, cmd, poolFetchCount)
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		for _, ad := range ads {
-			if ad.EarnedMicros > earned {
-				earned = ad.EarnedMicros
-			}
 			dup := false
 			for _, existing := range r.items {
 				if existing.ID == ad.ID {
@@ -52,10 +49,15 @@ func newAdRotator(cfg *Config, cmd string) *adRotator {
 				r.items = append(r.items, ad)
 			}
 		}
-		_ = earned
 	}()
 	return r
 }
+
+// poolFetchCount is how many extra items each renderer fetches in the background
+// to seed the rotation pool. Set above the old value of 4 so an ad-heavy command
+// (dbt, where most served items are sponsored) still catches a trending repo or a
+// tip and the line visibly rotates color, not just amber ad after amber ad.
+const poolFetchCount = 6
 
 // estCPMMicros is the nominal developer CPM ($20 per 1000 impressions, in
 // micros) used to project the value of the wait. Real advertiser revenue and
@@ -114,17 +116,14 @@ func composeLine(leftPlain string, elapsed time.Duration, item Ad, link string) 
 		prefix = "ad · "
 	}
 	// reserved width: leftPlain + " · " + meter + "  " + prefix
-	used := visibleLen(leftPlain) + 3 + visibleLen(meter) + 2 + len(prefix)
-	runes := []rune(item.Text)
+	used := visibleLen(leftPlain) + 3 + visibleLen(meter) + 2 + runewidth.StringWidth(prefix)
 	budget := cols - used
 	if budget < 8 {
 		// too narrow for the slot: status + meter only
 		return "\r\x1b[2K" + statusMeter
 	}
-	if len(runes) > budget {
-		runes = append(runes[:budget-1], '…')
-	}
-	slot := fmt.Sprintf("\x1b]8;;%s\x07\x1b[%sm%s%s\x1b[0m\x1b]8;;\x07", link, color, prefix, string(runes))
+	text := runewidth.Truncate(item.Text, budget, "…")
+	slot := fmt.Sprintf("\x1b]8;;%s\x07\x1b[%sm%s%s\x1b[0m\x1b]8;;\x07", link, color, prefix, text)
 	return "\r\x1b[2K" + statusMeter + "  " + slot
 }
 

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/term"
 )
 
 func TestSlotLabelDistinguishesContentFromAds(t *testing.T) {
@@ -42,6 +45,20 @@ func TestComposeLineDistinguishesContentByColorNotWord(t *testing.T) {
 	adLine := composeLine("⠙ dbt 1/3", time.Second, Ad{ID: "house_uv", Text: "uv · fast Python"}, "https://x")
 	if !strings.Contains(adLine, "ad · ") {
 		t.Errorf("paid ad missing its 'ad ·' disclosure: %q", adLine)
+	}
+}
+
+func TestComposeLineTruncatesWideGlyphsByColumn(t *testing.T) {
+	// A CJK ad (two columns per rune) must not overflow the line: the slot text's
+	// display width has to stay within the budget, not just its rune count.
+	cols := 80
+	if c, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && c > 0 {
+		cols = c
+	}
+	wide := strings.Repeat("本", 200)
+	line := composeLine("⠙ dbt 1/3", time.Second, Ad{ID: "house_x", Text: wide}, "https://x")
+	if w := visibleLen(line); w > cols {
+		t.Errorf("composed line overflows terminal width %d: got %d columns", cols, w)
 	}
 }
 
