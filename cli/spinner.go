@@ -56,29 +56,32 @@ func removeSpinnerVerb() error {
 	return writeClaudeSettingsAtomic(settings)
 }
 
-// Claude Code appends its own status — "(5s · ↓ 42 tokens · thinking …)" — after
-// the spinner verb, so a long verb pushes that status off the right edge where it
-// gets cut. Cap the verb (in terminal columns, so a CJK verb is held to the same
-// visible width) well short of a narrow 80-col line so the status fits.
-const maxSpinnerVerbCols = 28
+// Claude Code appends its own status — "(5s · ↓ 42 tokens · thinking with high
+// effort)" — after the spinner verb, so a long verb pushes that status off the
+// right edge where it gets cut. Keep the verb to a short label (in terminal
+// columns, so a CJK verb is held to the same visible width) that leaves room for
+// the status even on a narrow pane.
+const maxSpinnerVerbCols = 24
 
 func spinnerVerbForAd(ad Ad) string {
-	if v := capSpinnerVerb(stripControlChars(ad.SpinnerText)); v != "" {
+	if v := capSpinnerVerb(spinnerLabel(stripControlChars(ad.SpinnerText))); v != "" {
 		return v
 	}
+	return capSpinnerVerb(spinnerLabel(stripControlChars(ad.Text)))
+}
 
-	text := stripControlChars(ad.Text)
-	if before, _, ok := strings.Cut(text, " — "); ok {
-		if v := capSpinnerVerb(before); v != "" {
-			return v
+// spinnerLabel trims an ad down to its lead label — the tool or repo name before
+// the first description separator — so the verb stays short. The server ships full
+// sentences ("fd: a simple, fast alternative …") meant for the wrapped-command
+// line; the spinner only needs the name, the way Claude's native verbs are a
+// single word.
+func spinnerLabel(s string) string {
+	for _, sep := range []string{" — ", " - ", ": "} {
+		if before, _, ok := strings.Cut(s, sep); ok && strings.TrimSpace(before) != "" {
+			s = before
 		}
 	}
-	if before, _, ok := strings.Cut(text, " - "); ok {
-		if v := capSpinnerVerb(before); v != "" {
-			return v
-		}
-	}
-	return capSpinnerVerb(text)
+	return strings.TrimSpace(s)
 }
 
 // capSpinnerVerb drops a trailing ellipsis the server already appended (but not a

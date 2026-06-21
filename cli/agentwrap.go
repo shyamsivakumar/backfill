@@ -181,16 +181,15 @@ func runWithRewrite(cfg *Config, bin string, args []string) int {
 	return exit
 }
 
-// spinnerAdBytes builds the styled replacement: a short ad label the agent renders
-// in place of its spinner verb.
+// spinnerAdBytes builds the styled replacement: the "ad · " disclosure plus a short
+// label the agent renders in place of its spinner verb. Uses the same lead-label +
+// column cap as the Claude spinner so a verbose server description ("fd: a simple,
+// fast alternative …") never pushes the agent's own status off the right edge.
 func spinnerAdBytes(ad Ad) []byte {
 	text := ad.SpinnerText
 	if text == "" {
 		text = ad.Text
 	}
-	runes := []rune(stripControlChars(text))
-	if len(runes) > 44 {
-		runes = append(runes[:43], '…')
-	}
-	return []byte(fmt.Sprintf("ad · %s", string(runes)))
+	label := capSpinnerVerb(spinnerLabel(stripControlChars(text)))
+	return []byte(fmt.Sprintf("ad · %s", label))
 }

@@ -8,16 +8,12 @@ import (
 )
 
 func TestSpinnerVerbCappedSoClaudeStatusFits(t *testing.T) {
-	// The bug in the screenshot: the server sends a long spinnerText with its own
-	// trailing "...", and Claude appends "(5s · ↓ 42 tokens · …)" after it, so the
-	// line overflows and gets cut.
+	// The bug in the screenshot: the server sends a long descriptive spinnerText,
+	// and Claude appends "(5s · ↓ 42 tokens · thinking with high effort)" after it,
+	// so the line overflows and gets cut. The verb should collapse to the tool name.
 	long := Ad{ID: "tip_fd", SpinnerText: "fd: a simple, fast alternative to find with sensibl..."}
-	verb := spinnerVerbForAd(long)
-	if n := len([]rune(verb)); n > maxSpinnerVerbCols {
-		t.Errorf("verb too long for Claude's status to fit: %d runes %q", n, verb)
-	}
-	if strings.HasSuffix(verb, "...") {
-		t.Errorf("server's trailing ellipsis not normalized: %q", verb)
+	if got := spinnerVerbForAd(long); got != "fd" {
+		t.Errorf("verbose spinnerText should collapse to the tool name: got %q", got)
 	}
 
 	split := Ad{ID: "house_uv", Text: "uv — fast Python packages and project installs"}
@@ -25,9 +21,10 @@ func TestSpinnerVerbCappedSoClaudeStatusFits(t *testing.T) {
 		t.Errorf("verb should split on the em dash: got %q", got)
 	}
 
+	// A short " · " house verb keeps its form (no description separator to split on).
 	spinner := Ad{ID: "house_ripgrep", SpinnerText: "ripgrep · fast search"}
 	if got := spinnerVerbForAd(spinner); got != "ripgrep · fast search" {
-		t.Errorf("a short spinnerText should pass through unchanged: got %q", got)
+		t.Errorf("a short · verb should pass through unchanged: got %q", got)
 	}
 
 	// A spinnerText that is only an ellipsis caps to empty; fall through to Text
@@ -55,5 +52,14 @@ func TestSpinnerVerbCappedSoClaudeStatusFits(t *testing.T) {
 	wide := strings.Repeat("本", 40)
 	if got := runewidth.StringWidth(capSpinnerVerb(wide)); got > maxSpinnerVerbCols {
 		t.Errorf("CJK verb exceeds the column cap: width %d", got)
+	}
+}
+
+func TestSpinnerAdBytesShortLabelForInlineAgents(t *testing.T) {
+	// Factory/Codex inline injection must collapse a verbose description to the
+	// tool name + the "ad · " disclosure, not the whole sentence.
+	got := string(spinnerAdBytes(Ad{ID: "tip_fd", SpinnerText: "fd: a simple, fast alternative to find with sensibl..."}))
+	if got != "ad · fd" {
+		t.Errorf("inline agent verb should be the short label: got %q", got)
 	}
 }
