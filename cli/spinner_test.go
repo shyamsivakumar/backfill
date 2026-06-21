@@ -27,6 +27,12 @@ func TestSpinnerVerbCappedSoClaudeStatusFits(t *testing.T) {
 		t.Errorf("a short · verb should pass through unchanged: got %q", got)
 	}
 
+	// A long trending "owner/repo" shows the repo name, not a mid-word truncation.
+	repo := Ad{ID: "gh_ebook", Text: "EbookFoundation/free-programming-books"}
+	if got := spinnerVerbForAd(repo); got != "free-programming-books" {
+		t.Errorf("trending repo should collapse to the repo name: got %q", got)
+	}
+
 	// A spinnerText that is only an ellipsis caps to empty; fall through to Text
 	// rather than emit a blank verb.
 	punct := Ad{ID: "house_x", SpinnerText: "…", Text: "delta — a syntax-highlighting pager for git"}

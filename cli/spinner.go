@@ -81,7 +81,15 @@ func spinnerLabel(s string) string {
 			s = before
 		}
 	}
-	return strings.TrimSpace(s)
+	s = strings.TrimSpace(s)
+	// A trending entry is "owner/repo": show the repo name (the recognizable,
+	// shorter half) rather than truncating the owner mid-word into "owner/re…".
+	if !strings.ContainsAny(s, " \t") && strings.Contains(s, "/") {
+		if i := strings.LastIndexByte(s, '/'); i >= 0 && i+1 < len(s) {
+			s = s[i+1:]
+		}
+	}
+	return s
 }
 
 // capSpinnerVerb drops a trailing ellipsis the server already appended (but not a
