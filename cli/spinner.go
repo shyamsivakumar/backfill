@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -64,10 +65,36 @@ func removeSpinnerVerb() error {
 const maxSpinnerVerbCols = 24
 
 func spinnerVerbForAd(ad Ad) string {
-	if v := capSpinnerVerb(spinnerLabel(stripControlChars(ad.SpinnerText))); v != "" {
-		return v
+	label := capSpinnerVerb(spinnerLabel(stripControlChars(ad.SpinnerText)))
+	if label == "" {
+		label = capSpinnerVerb(spinnerLabel(stripControlChars(ad.Text)))
 	}
-	return capSpinnerVerb(spinnerLabel(stripControlChars(ad.Text)))
+	if label == "" {
+		return ""
+	}
+	return spinnerTypeMarker(ad.ID) + label
+}
+
+// spinnerTypeMarker returns a colored circle glyph that signals the content type
+// in Claude's spinner — green=tip, blue=trending repo, orange=ad. Claude renders
+// verbs through Ink, which never honors ANSI, so a colored emoji is the only way
+// to carry color into that surface: the glyph is colored by the font, not by an
+// escape code. Gated to macOS because the same emoji renders as a tofu box on a
+// bare Linux/TTY where color fonts are absent.
+func spinnerTypeMarker(id string) string {
+	if runtime.GOOS != "darwin" {
+		return ""
+	}
+	switch {
+	case strings.HasPrefix(id, "gh_"), strings.HasPrefix(id, "hn_"):
+		return "\U0001F535 " // blue circle — trending repo / HN
+	case strings.HasPrefix(id, "tip_"):
+		return "\U0001F7E2 " // green circle — tip
+	case id == "" || id == "earnings":
+		return ""
+	default:
+		return "\U0001F7E0 " // orange circle — paid ad
+	}
 }
 
 // spinnerLabel trims an ad down to its lead label — the tool or repo name before
