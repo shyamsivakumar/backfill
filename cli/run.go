@@ -55,6 +55,10 @@ func runWrapped(args []string) int {
 	if !cfg.Enabled || !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return runPlain(bin, args)
 	}
+	// Stash the live terminal width so the tty-less spinner hook can size verbs.
+	if c, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+		cacheTermCols(c)
+	}
 	if isSqlmeshRunFamily(args) {
 		return runSqlmeshProgress(cfg, bin, args)
 	}

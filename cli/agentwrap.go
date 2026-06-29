@@ -190,6 +190,6 @@ func spinnerAdBytes(ad Ad) []byte {
 	if text == "" {
 		text = ad.Text
 	}
-	label := capSpinnerVerb(spinnerLabel(stripControlChars(text)))
+	label := capSpinnerVerb(spinnerLabel(stripControlChars(text)), spinnerVerbCols())
 	return []byte(fmt.Sprintf("ad · %s", label))
 }

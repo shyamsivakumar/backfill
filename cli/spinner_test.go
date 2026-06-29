@@ -11,10 +11,10 @@ import (
 // labelFor reproduces the label half of spinnerVerbForAd (without the type marker)
 // so label assertions stay independent of the platform-gated emoji prefix.
 func labelFor(a Ad) string {
-	if v := capSpinnerVerb(spinnerLabel(stripControlChars(a.SpinnerText))); v != "" {
+	if v := capSpinnerVerb(spinnerLabel(stripControlChars(a.SpinnerText)), fallbackSpinnerVerbCols); v != "" {
 		return v
 	}
-	return capSpinnerVerb(spinnerLabel(stripControlChars(a.Text)))
+	return capSpinnerVerb(spinnerLabel(stripControlChars(a.Text)), fallbackSpinnerVerbCols)
 }
 
 func TestSpinnerLabelStaysShort(t *testing.T) {
@@ -36,27 +36,56 @@ func TestSpinnerLabelStaysShort(t *testing.T) {
 		if got := labelFor(c.ad); got != c.want {
 			t.Errorf("label for %+v = %q, want %q", c.ad, got, c.want)
 		}
-		// The full verb is the type marker plus the label.
-		if got := spinnerVerbForAd(c.ad); got != spinnerTypeMarker(c.ad.ID)+c.want {
-			t.Errorf("spinnerVerbForAd(%+v) = %q, want marker+%q", c.ad, got, c.want)
+		// The full verb is the type marker plus the label. Bare-name content (gh/hn)
+		// gets a natural source appended; that wiring is covered separately.
+		if spinnerContentSuffix(c.ad.ID) == "" {
+			if got := spinnerVerbForAd(c.ad, fallbackSpinnerVerbCols); got != spinnerTypeMarker(c.ad.ID)+c.want {
+				t.Errorf("spinnerVerbForAd(%+v) = %q, want marker+%q", c.ad, got, c.want)
+			}
 		}
+	}
+}
+
+func TestSpinnerContentSuffix(t *testing.T) {
+	// A wide budget shows the full repo name plus its natural source.
+	if got := spinnerVerbForAd(Ad{ID: "gh_x", Text: "owner/litestar"}, 50); got != spinnerTypeMarker("gh_x")+"litestar on GitHub" {
+		t.Errorf("gh verb = %q, want marker+%q", got, "litestar on GitHub")
+	}
+	if got := spinnerVerbForAd(Ad{ID: "hn_1", Text: "kitten"}, 50); got != spinnerTypeMarker("hn_1")+"kitten on HN" {
+		t.Errorf("hn verb = %q, want marker+%q", got, "kitten on HN")
+	}
+	// An ad already ends on a "· descriptor", so no source is appended.
+	if got := spinnerVerbForAd(Ad{ID: "camp_x", SpinnerText: "ripgrep · fast search"}, 50); got != spinnerTypeMarker("camp_x")+"ripgrep · fast search" {
+		t.Errorf("ad verb should be unchanged: got %q", got)
+	}
+	// A narrow budget truncates the name but keeps the source word whole.
+	got := spinnerVerbForAd(Ad{ID: "gh_x", Text: "owner/free-programming-books"}, fallbackSpinnerVerbCols)
+	if !strings.HasSuffix(got, " on GitHub") {
+		t.Errorf("source word should survive truncation: got %q", got)
+	}
+	if w := runewidth.StringWidth(strings.TrimPrefix(got, spinnerTypeMarker("gh_x"))); w > fallbackSpinnerVerbCols {
+		t.Errorf("verb width %d exceeds budget %d: %q", w, fallbackSpinnerVerbCols, got)
 	}
 }
 
 func TestCapSpinnerVerb(t *testing.T) {
 	// A lone trailing period is part of the word, not a server ellipsis.
-	if got := capSpinnerVerb("etc."); got != "etc." {
+	if got := capSpinnerVerb("etc.", fallbackSpinnerVerbCols); got != "etc." {
 		t.Errorf("lone trailing period should survive: got %q", got)
 	}
 	// Degenerate inputs collapse to empty without looping forever.
 	for _, s := range []string{"", "   ", "…", "...", "… … …", "...…..."} {
-		if got := capSpinnerVerb(s); got != "" {
+		if got := capSpinnerVerb(s, fallbackSpinnerVerbCols); got != "" {
 			t.Errorf("degenerate input %q should cap to empty: got %q", s, got)
 		}
 	}
 	// Wide (CJK) glyphs count as two columns, so the cap holds visible width.
-	if got := runewidth.StringWidth(capSpinnerVerb(strings.Repeat("本", 40))); got > maxSpinnerVerbCols {
+	if got := runewidth.StringWidth(capSpinnerVerb(strings.Repeat("本", 40), fallbackSpinnerVerbCols)); got > fallbackSpinnerVerbCols {
 		t.Errorf("CJK verb exceeds the column cap: width %d", got)
+	}
+	// A wider budget lets a long repo name through without truncation.
+	if got := capSpinnerVerb("defending-code-reference-harness", 50); got != "defending-code-reference-harness" {
+		t.Errorf("wide budget should not truncate: got %q", got)
 	}
 }
 
@@ -71,11 +100,11 @@ func TestSpinnerTypeMarkerColorsByType(t *testing.T) {
 		return
 	}
 	cases := map[string]string{
-		"gh_repo":  "\U0001F535 ", // blue — trending
-		"hn_123":   "\U0001F535 ",
-		"tip_uv":   "\U0001F7E2 ", // green — tip
-		"camp_abc": "\U0001F7E0 ", // orange — paid ad
-		"house_uv": "\U0001F7E0 ",
+		"gh_repo":  "\U0001F539 ", // small blue diamond — free content
+		"hn_123":   "\U0001F539 ",
+		"tip_uv":   "\U0001F539 ", // small blue diamond — free content (tips too)
+		"camp_abc": "\U0001F538 ", // small orange diamond — paid ad
+		"house_uv": "\U0001F538 ",
 	}
 	for id, want := range cases {
 		if got := spinnerTypeMarker(id); got != want {
@@ -94,7 +123,7 @@ func TestSpinnerAdBytesShortLabelForInlineAgents(t *testing.T) {
 	// Factory/Codex inline injection collapses a verbose description to the tool
 	// name + the "ad · " disclosure, not the whole sentence.
 	got := string(spinnerAdBytes(Ad{ID: "tip_fd", SpinnerText: "fd: a simple, fast alternative to find with sensibl..."}))
-	if got != "ad · fd" {
+	if !strings.HasPrefix(got, "ad · fd") {
 		t.Errorf("inline agent verb should be the short label: got %q", got)
 	}
 }
