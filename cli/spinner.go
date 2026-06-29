@@ -60,16 +60,18 @@ func removeSpinnerVerb() error {
 }
 
 // fallbackSpinnerVerbCols is the verb width used when the terminal size can't be
-// read (a hook with no tty and no cached width). Conservative so a narrow pane
-// never overflows; spinnerVerbCols widens it whenever the real width is known.
-const fallbackSpinnerVerbCols = 24
+// read (a hook with no tty and no cached width). Sized so a "name · description"
+// reads as a phrase rather than a stub, while still fitting an 80-column pane next
+// to the status; spinnerVerbCols widens it whenever the real width is known.
+const fallbackSpinnerVerbCols = 36
 
 // spinnerStatusReserve is the width Claude keeps to the right of the verb: its own
 // leading glyph, our type marker, and the appended status, e.g.
-// "(123s · ↓ 9.9k tokens · thinking with high effort)". The verb budget is the
-// terminal width minus this, so a wide window shows full repo names and only a
-// narrow one truncates.
-const spinnerStatusReserve = 55
+// "(4m 47s · ↑ 5.1k tokens)". The verb budget is the terminal width minus this, so
+// a wide window shows the full "name · description" and only a narrow one truncates
+// the description tail. Sized to the live status; a longer status form clips on its
+// own end before it eats the verb.
+const spinnerStatusReserve = 40
 
 // spinnerVerbCols is the column budget for the verb label, derived from the real
 // terminal width when it can be read. Claude appends its status after the verb, so
@@ -103,16 +105,18 @@ func spinnerContentSuffix(id string) string {
 }
 
 func spinnerVerbForAd(ad Ad, maxCols int) string {
-	raw := spinnerLabel(stripControlChars(ad.SpinnerText))
-	if capSpinnerVerb(raw, maxCols) == "" {
-		raw = spinnerLabel(stripControlChars(ad.Text))
+	// Prefer the rich Text ("name · description") over SpinnerText, which for a
+	// trending repo is just the bare "owner/repo" slug — a stub that reads as cut.
+	raw := spinnerFullLabel(stripControlChars(ad.Text))
+	if raw == "" {
+		raw = spinnerFullLabel(stripControlChars(ad.SpinnerText))
 	}
 	label := capSpinnerVerb(raw, maxCols)
 	if label == "" {
 		return ""
 	}
-	// A single bare token (no descriptor) gets a natural source appended; the name
-	// truncates to make room, the source word always stays whole.
+	// Fallback only when there is no description to complete the phrase: a bare name
+	// gets a natural source so it never sits alone before Claude's trailing "…".
 	if suffix := spinnerContentSuffix(ad.ID); suffix != "" && !strings.ContainsAny(label, " ·") {
 		nameCols := maxCols - runewidth.StringWidth(suffix)
 		if nameCols < 4 {
@@ -121,6 +125,25 @@ func spinnerVerbForAd(ad Ad, maxCols int) string {
 		label = capSpinnerVerb(raw, nameCols) + suffix
 	}
 	return spinnerTypeMarker(ad.ID) + label
+}
+
+// spinnerFullLabel keeps the whole "name · description" so the verb fills the line,
+// shortening only a leading "owner/repo" slug to the repo name — the recognizable
+// half — while leaving the description intact. capSpinnerVerb truncates the tail
+// later if the real width can't hold it.
+func spinnerFullLabel(s string) string {
+	s = strings.TrimSpace(s)
+	name, rest, hasDesc := strings.Cut(s, " · ")
+	name = strings.TrimSpace(name)
+	if !strings.ContainsAny(name, " \t") && strings.Contains(name, "/") {
+		if i := strings.LastIndexByte(name, '/'); i >= 0 && i+1 < len(name) {
+			name = name[i+1:]
+		}
+	}
+	if hasDesc {
+		return name + " · " + strings.TrimSpace(rest)
+	}
+	return name
 }
 
 // spinnerTypeMarker returns a small colored diamond that signals the content type
@@ -184,10 +207,13 @@ func capSpinnerVerb(s string, maxCols int) string {
 
 // detectTermCols returns the controlling terminal's column count, trying the
 // standard streams first, then /dev/tty (so it works from a hook whose stdout is a
-// pipe), then the width cached by the last wrapped command. Returns 0 if unknown.
+// pipe), then the width cached by the last call that had a tty. Any live read is
+// cached, so a later tty-less spinner hook still sizes verbs to the real pane.
+// Returns 0 if unknown.
 func detectTermCols() int {
 	for _, f := range []*os.File{os.Stdout, os.Stderr, os.Stdin} {
 		if c, _, err := term.GetSize(int(f.Fd())); err == nil && c > 0 {
+			cacheTermCols(c)
 			return c
 		}
 	}
@@ -195,6 +221,7 @@ func detectTermCols() int {
 		c, _, err := term.GetSize(int(tty.Fd()))
 		tty.Close()
 		if err == nil && c > 0 {
+			cacheTermCols(c)
 			return c
 		}
 	}
@@ -206,8 +233,8 @@ func termColsCachePath() string {
 	return filepath.Join(home, ".backfill", "term-cols")
 }
 
-// cacheTermCols records the terminal width from a context that has a real tty (a
-// wrapped command), so the tty-less spinner hook can still size verbs to the pane.
+// cacheTermCols records the terminal width from any context that has a real tty,
+// so the tty-less spinner hook can still size verbs to the pane.
 func cacheTermCols(cols int) {
 	if cols <= 0 {
 		return

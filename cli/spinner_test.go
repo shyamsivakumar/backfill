@@ -32,39 +32,38 @@ func TestSpinnerLabelStaysShort(t *testing.T) {
 		// An ellipsis-only spinnerText caps to empty and falls through to Text.
 		{Ad{ID: "house_x", SpinnerText: "…", Text: "delta — a syntax-highlighting pager for git"}, "delta"},
 	}
+	// labelFor exercises spinnerLabel, the short single-token form still used for
+	// inline agents (Codex/Factory). The Claude spinner now keeps the full
+	// description; that wiring is covered by TestSpinnerVerbFull.
 	for _, c := range cases {
 		if got := labelFor(c.ad); got != c.want {
 			t.Errorf("label for %+v = %q, want %q", c.ad, got, c.want)
 		}
-		// The full verb is the type marker plus the label. Bare-name content (gh/hn)
-		// gets a natural source appended; that wiring is covered separately.
-		if spinnerContentSuffix(c.ad.ID) == "" {
-			if got := spinnerVerbForAd(c.ad, fallbackSpinnerVerbCols); got != spinnerTypeMarker(c.ad.ID)+c.want {
-				t.Errorf("spinnerVerbForAd(%+v) = %q, want marker+%q", c.ad, got, c.want)
-			}
-		}
 	}
 }
 
-func TestSpinnerContentSuffix(t *testing.T) {
-	// A wide budget shows the full repo name plus its natural source.
-	if got := spinnerVerbForAd(Ad{ID: "gh_x", Text: "owner/litestar"}, 50); got != spinnerTypeMarker("gh_x")+"litestar on GitHub" {
-		t.Errorf("gh verb = %q, want marker+%q", got, "litestar on GitHub")
+func TestSpinnerVerbFull(t *testing.T) {
+	m := spinnerTypeMarker
+	// A trending repo shows "repo · description" — owner dropped, description kept —
+	// sourced from the rich Text, not the bare SpinnerText slug.
+	if got := spinnerVerbForAd(Ad{ID: "gh_tf", Text: "tensorflow/tensorflow · An Open Source ML Framework", SpinnerText: "tensorflow/tensorflow"}, 60); got != m("gh_tf")+"tensorflow · An Open Source ML Framework" {
+		t.Errorf("trending verb = %q", got)
 	}
-	if got := spinnerVerbForAd(Ad{ID: "hn_1", Text: "kitten"}, 50); got != spinnerTypeMarker("hn_1")+"kitten on HN" {
-		t.Errorf("hn verb = %q, want marker+%q", got, "kitten on HN")
+	// An ad uses its full Text description, not the shortened SpinnerText.
+	if got := spinnerVerbForAd(Ad{ID: "house_uv", Text: "uv · fast Python packages and project installs", SpinnerText: "uv · Python packages"}, 60); got != m("house_uv")+"uv · fast Python packages and project installs" {
+		t.Errorf("ad verb should use full Text: got %q", got)
 	}
-	// An ad already ends on a "· descriptor", so no source is appended.
-	if got := spinnerVerbForAd(Ad{ID: "camp_x", SpinnerText: "ripgrep · fast search"}, 50); got != spinnerTypeMarker("camp_x")+"ripgrep · fast search" {
-		t.Errorf("ad verb should be unchanged: got %q", got)
+	// A bare slug with no description falls back to the natural source.
+	if got := spinnerVerbForAd(Ad{ID: "gh_bat", Text: "sharkdp/bat"}, 50); got != m("gh_bat")+"bat on GitHub" {
+		t.Errorf("bare verb = %q, want %q", got, "bat on GitHub")
 	}
-	// A narrow budget truncates the name but keeps the source word whole.
-	got := spinnerVerbForAd(Ad{ID: "gh_x", Text: "owner/free-programming-books"}, fallbackSpinnerVerbCols)
-	if !strings.HasSuffix(got, " on GitHub") {
-		t.Errorf("source word should survive truncation: got %q", got)
-	}
-	if w := runewidth.StringWidth(strings.TrimPrefix(got, spinnerTypeMarker("gh_x"))); w > fallbackSpinnerVerbCols {
+	// A narrow budget truncates the description tail and never exceeds the budget.
+	got := spinnerVerbForAd(Ad{ID: "gh_tf", Text: "tensorflow/tensorflow · An Open Source ML Framework"}, fallbackSpinnerVerbCols)
+	if w := runewidth.StringWidth(strings.TrimPrefix(got, m("gh_tf"))); w > fallbackSpinnerVerbCols {
 		t.Errorf("verb width %d exceeds budget %d: %q", w, fallbackSpinnerVerbCols, got)
+	}
+	if !strings.HasSuffix(got, "…") {
+		t.Errorf("overflow should end in an ellipsis: got %q", got)
 	}
 }
 
