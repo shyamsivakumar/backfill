@@ -170,7 +170,7 @@ For Claude Code you can also install via the plugin marketplace: `/plugin market
 | Any CLI tool | `cargo`, `docker`, `make`, `terraform`, `gradle`, … | `bf init` covers these, or `bf wrap <cmd>` / `bf init --all` |
 | Coding agents | Claude Code / Factory droid / Codex spinner verb | `bf agents install …` |
 | Scaffold screens | `npm create`, `cargo new`, `rails new`, … | automatic on a clean wrapped run |
-| CI build logs | the GitHub Action (`action.yml`) | maintainer-directed earnings |
+| CI build logs | the GitHub Action (`action/action.yml`) | maintainer-directed earnings |
 
 ## Privacy
 
@@ -223,7 +223,7 @@ A frequency cap stops a device from seeing the same ad back to back across runs,
 |---|---|
 | `cli/` | `bf`, the Go wrapper (~600 lines). Runs the two ad surfaces. |
 | `web/` | Next.js (App Router): landing, advertiser portal, dashboard, ad-serve + event API, Postgres via Drizzle on Neon. |
-| `action.yml` | GitHub Action: the same model for CI build logs, with maintainer-directed earnings. |
+| `action/action.yml` | GitHub Action: the same model for CI build logs, with maintainer-directed earnings. |
 | `python/` | Thin Python wrapper shipped in the `backfill-cli` wheel: fetches + SHA-256-verifies the Go binary, re-signs it ad-hoc on macOS, then execs it. |
 
 ## Tests

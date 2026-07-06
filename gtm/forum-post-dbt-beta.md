@@ -9,7 +9,7 @@
 
 **Image placement:**
 
-- Drag `assets/dbt-real.gif` in right under the first paragraph.
+- Drag `assets/dbt.gif` in right under the first paragraph.
 - Optionally drop `assets/screenshot-dbt-footer.png` near the bottom.
 
 ---
