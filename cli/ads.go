@@ -21,6 +21,19 @@ type Ad struct {
 	EarnedMicros int64  `json:"earnedMicros"`
 }
 
+type deviceRegistrationPayload struct {
+	DeviceID   string `json:"deviceId"`
+	SecretHash string `json:"secretHash"`
+}
+
+type impressionPayload struct {
+	DeviceID string `json:"deviceId"`
+	AdID     string `json:"adId"`
+	Cmd      string `json:"cmd"`
+	Seconds  int    `json:"seconds"`
+	Kind     string `json:"kind"`
+}
+
 // Shown when the ad server is unreachable. Preview slots — they never earn.
 var houseAds = []Ad{
 	{ID: "house_uv", Text: "uv · fast Python packages and project installs", URL: "https://docs.astral.sh/uv/", SpinnerText: "uv · Python packages"},
@@ -96,12 +109,30 @@ func registerDevice(cfg *Config) {
 	}
 
 	sum := sha256.Sum256([]byte(cfg.DeviceSecret))
-	body, _ := json.Marshal(map[string]any{
-		"deviceId":   cfg.DeviceID,
-		"secretHash": hex.EncodeToString(sum[:]),
+	body, _ := json.Marshal(deviceRegistrationPayload{
+		DeviceID:   cfg.DeviceID,
+		SecretHash: hex.EncodeToString(sum[:]),
 	})
 
 	resp, err := httpClient.Post(cfg.APIBase+"/api/device/register", "application/json", bytes.NewReader(body))
+	if err == nil {
+		resp.Body.Close()
+	}
+}
+
+func impressionBody(cfg *Config, ad Ad, cmd string, seconds int) *bytes.Reader {
+	body, _ := json.Marshal(impressionPayload{
+		DeviceID: cfg.DeviceID,
+		AdID:     ad.ID,
+		Cmd:      cmd,
+		Seconds:  seconds,
+		Kind:     "impression",
+	})
+	return bytes.NewReader(body)
+}
+
+func postImpression(cfg *Config, ad Ad, cmd string, seconds int) {
+	resp, err := httpClient.Post(cfg.APIBase+"/api/events", "application/json", impressionBody(cfg, ad, cmd, seconds))
 	if err == nil {
 		resp.Body.Close()
 	}
@@ -115,15 +146,5 @@ func reportImpression(cfg *Config, ad Ad, cmd string, seconds int) {
 		registerDevice(cfg)
 	})
 
-	body, _ := json.Marshal(map[string]any{
-		"deviceId": cfg.DeviceID,
-		"adId":     ad.ID,
-		"cmd":      cmd,
-		"seconds":  seconds,
-		"kind":     "impression",
-	})
-	resp, err := httpClient.Post(cfg.APIBase+"/api/events", "application/json", bytes.NewReader(body))
-	if err == nil {
-		resp.Body.Close()
-	}
+	postImpression(cfg, ad, cmd, seconds)
 }

@@ -324,7 +324,7 @@ func cmdSpinnerRefresh() {
 			if elapsed > 90 {
 				elapsed = 90
 			}
-			reportImpressionFast(cfg, cache.Ad, "claude-code", elapsed)
+			postImpression(cfg, cache.Ad, "claude-code", elapsed)
 		}
 	}
 

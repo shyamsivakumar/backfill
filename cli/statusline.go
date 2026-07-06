@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -73,7 +71,7 @@ func cmdStatuslineRefresh() {
 			if elapsed > 90 {
 				elapsed = 90
 			}
-			reportImpressionFast(cfg, cache.Ad, "claude-code", elapsed)
+			postImpression(cfg, cache.Ad, "claude-code", elapsed)
 		}
 	}
 
@@ -148,19 +146,4 @@ func printStatuslineAd(cfg *Config, ad Ad) {
 	text := stripControlChars(ad.Text)
 	href := fmt.Sprintf("%s/r/%s?d=%s", cfg.APIBase, url.PathEscape(adID), url.QueryEscape(cfg.DeviceID))
 	fmt.Printf("\x1b[2mad\x1b[0m \x1b]8;;%s\x1b\\\x1b[33m%s\x1b[0m\x1b]8;;\x1b\\\n", href, text)
-}
-
-func reportImpressionFast(cfg *Config, ad Ad, cmd string, seconds int) {
-	body, _ := json.Marshal(map[string]any{
-		"deviceId": cfg.DeviceID,
-		"adId":     ad.ID,
-		"cmd":      cmd,
-		"seconds":  seconds,
-		"kind":     "impression",
-	})
-	client := &http.Client{Timeout: 800 * time.Millisecond}
-	resp, err := client.Post(cfg.APIBase+"/api/events", "application/json", bytes.NewReader(body))
-	if err == nil {
-		resp.Body.Close()
-	}
 }

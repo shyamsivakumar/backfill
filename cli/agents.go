@@ -89,7 +89,7 @@ func agentsUsage() {
 }
 
 func parseAgentArgs(args []string, allowForce bool) ([]agentTarget, bool, bool) {
-	target := "all"
+	target := ""
 	force := false
 
 	for _, arg := range args {
@@ -100,13 +100,17 @@ func parseAgentArgs(args []string, allowForce bool) ([]agentTarget, bool, bool) 
 			}
 			force = true
 		case "claude", "codex", "factory", "droid", "all":
-			if target != "all" {
+			if target != "" {
 				return nil, false, false
 			}
 			target = arg
 		default:
 			return nil, false, false
 		}
+	}
+
+	if target == "" {
+		target = "all"
 	}
 
 	switch target {
@@ -598,49 +602,12 @@ func writeCodexConfig(b []byte) error {
 	return os.WriteFile(p, b, 0o600)
 }
 
-func backupCodexConfig(original []byte) {
-	p := codexConfigBackupPath()
-	if _, err := os.Stat(p); err == nil {
-		return
-	}
-	os.MkdirAll(filepath.Dir(p), 0o755)
-	os.WriteFile(p, original, 0o600)
-}
-
 func readCodexConfigBackup() ([]byte, bool) {
 	b, err := os.ReadFile(codexConfigBackupPath())
 	if err != nil {
 		return nil, false
 	}
 	return b, true
-}
-
-func installCodexStatusLine(b []byte, exe string) []byte {
-	lines := splitLines(string(b))
-	statusLine := fmt.Sprintf("status_line = [%q, \"statusline\"]", exe)
-	timeoutLine := "status_line_timeout_ms = 450"
-
-	tuiStart, tuiEnd := findSection(lines, "tui")
-	if tuiStart >= 0 {
-		out := make([]string, 0, len(lines)+2)
-		out = append(out, lines[:tuiStart+1]...)
-		out = append(out, statusLine+"\n", timeoutLine+"\n")
-		for i := tuiStart + 1; i < tuiEnd; i++ {
-			if isCodexStatusLineKey(lines[i]) || isCodexStatusLineTimeoutKey(lines[i]) {
-				continue
-			}
-			out = append(out, lines[i])
-		}
-		out = append(out, lines[tuiEnd:]...)
-		return []byte(strings.Join(out, ""))
-	}
-
-	s := string(b)
-	if s != "" && !strings.HasSuffix(s, "\n") {
-		s += "\n"
-	}
-	s += "\n[tui]\n" + statusLine + "\n" + timeoutLine + "\n"
-	return []byte(s)
 }
 
 func removeCodexStatusLine(b []byte, restoreLine string) []byte {
@@ -691,24 +658,6 @@ func splitLines(s string) []string {
 		lines = lines[:len(lines)-1]
 	}
 	return lines
-}
-
-func findSection(lines []string, name string) (int, int) {
-	header := "[" + name + "]"
-	for i, line := range lines {
-		if strings.TrimSpace(line) == header {
-			end := len(lines)
-			for j := i + 1; j < len(lines); j++ {
-				trimmed := strings.TrimSpace(lines[j])
-				if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-					end = j
-					break
-				}
-			}
-			return i, end
-		}
-	}
-	return -1, -1
 }
 
 func findSectionContaining(lines []string, idx int) (int, int) {
