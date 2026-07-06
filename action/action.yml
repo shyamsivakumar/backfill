@@ -14,7 +14,7 @@ inputs:
   api:
     description: 'Backfill API base'
     required: false
-    default: 'http://localhost:3000'
+    default: 'https://backfill.sh'
 runs:
   using: composite
   steps:

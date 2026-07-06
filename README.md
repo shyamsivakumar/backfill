@@ -22,7 +22,7 @@ dbt run                    # runs exactly as before, with a sponsored line that 
 
 There are exactly two surfaces, and no reserved row anywhere.
 
-1. **Coding agents** (Claude Code, Factory droid, Codex). `bf agents install claude` (and `droid` / `codex`) sets the agent's thinking-spinner verb to a rotating batch. The ad, a trending dev content slot, and your running `$X.XX earned` tally cycle while it thinks. It installs no status line and never touches an existing one. The verb refreshes on `SessionStart` and each turn.
+1. **Coding agents**. `bf agents install claude` sets Claude Code's thinking-spinner verb to a rotating batch. `bf agents install droid` does the same for Factory droid, and Codex can be launched through `bf spin codex`. The ad, a trending dev content slot, and your running `$X.XX earned` tally cycle while the agent thinks. It installs no Claude status line and never touches an existing one. Claude refreshes the verb on `SessionStart` and each turn.
 2. **Any other wrapped command** (dbt, sqlmesh, cargo, docker, make, `terraform plan`, npm/pnpm/yarn/bun install, pip, go). The run collapses into one live line that rotates the ad, a trending repo / HN story / tip, and your $earned tally, with a spinner and an elapsed timer. That single line replaces the scrolling output in place. On a non-zero exit the captured output is flushed, so failures are never hidden. dbt and sqlmesh also show model progress counts on that line.
 
 Interactive and full-screen commands (vim, less, ssh, sudo, gh, psql and other REPLs, `terraform apply`, `docker run -it`, `npm init` / `npm login`) are detected and run directly in your terminal, untouched. CI and non-TTY runs exec plainly with zero overhead.
@@ -67,7 +67,7 @@ On **Paradime**, the durable path is `bf init`. It adds a real `export PATH="$HO
 
 ## Commands
 
-`bf` is a single Go binary (~600 lines, MIT). The full surface:
+`bf` is a single MIT-licensed Go binary. The full surface:
 
 | Command | What it does |
 |---|---|
@@ -79,10 +79,10 @@ On **Paradime**, the durable path is `bf init`. It adds a real `export PATH="$HO
 | `bf uninit` | Remove every shim `bf init` / `bf init --all` / `bf wrap` installed, and strip the `PATH` line from your rc. |
 | `bf on` / `bf off` | Globally pause or resume. `off` execs plainly with zero overhead, as if no shim is installed. |
 | `bf status` | Show what's wrapped, current `on`/`off` state, and your device id and dashboard link. |
-| `bf claim <email>` | Print a one-time code and link to bind this device to your web account, so earnings show in your dashboard. |
+| `bf claim` | Print a one-time code and link to bind this device to your web account, so earnings show in your dashboard. |
 | `bf agents install claude` | Spinner-verb rotation for Claude Code. No status line. |
 | `bf agents install droid` | Spinner-verb rotation for Factory `droid`. No status line. |
-| `bf agents install codex` | Spinner-verb rotation for Codex. No status line. |
+| `bf spin codex` | Run Codex through the spinner rewriter. |
 | `bf agents remove <name>` | Remove a previously installed agent integration. |
 | `bf agents status` | Show which agent integrations are installed. |
 
@@ -152,7 +152,7 @@ Scaffold completions are separate (see above): after `npm create` / `npm init`, 
 |---|---|---|
 | Claude Code | Spinner-verb rotation (no status line) | `bf agents install claude` |
 | Factory (`droid`) | Spinner-verb rotation (no status line) | `bf agents install droid` |
-| Codex | Spinner-verb rotation (no status line) | `bf agents install codex` |
+| Codex | Spinner rewriter for the running command | `bf spin codex` |
 
 For Claude Code you can also install via the plugin marketplace: `/plugin marketplace add shyamsivakumar/backfill` then `/plugin install backfill@backfill`. `bf agents remove claude` undoes it.
 
@@ -168,7 +168,7 @@ For Claude Code you can also install via the plugin marketplace: `/plugin market
 |---|---|---|
 | dbt + data stack | `dbt`, `bq`, `snowsql`, `spark-submit`, `sqlmesh` | `bf init` (curated set) or `bf wrap <cmd>` |
 | Any CLI tool | `cargo`, `docker`, `make`, `terraform`, `gradle`, … | `bf init` covers these, or `bf wrap <cmd>` / `bf init --all` |
-| Coding agents | Claude Code / Factory droid / Codex spinner verb | `bf agents install …` |
+| Coding agents | Claude Code / Factory droid spinner verbs; Codex spinner rewrite | `bf agents install …` or `bf spin codex` |
 | Scaffold screens | `npm create`, `cargo new`, `rails new`, … | automatic on a clean wrapped run |
 | CI build logs | the GitHub Action (`action/action.yml`) | maintainer-directed earnings |
 
@@ -182,13 +182,13 @@ The CLI is structurally incapable of reading your code, command args, command ou
 - **visible seconds**, how long the line was actually on screen
 - **event kind**, a static label, `impression` or `click`
 
-No args, no paths, no filenames, no env, no stdout or stderr contents. The source is open (MIT, ~600 lines of Go), so you can verify.
+No args, no paths, no filenames, no env, no stdout or stderr contents. The source is open under the MIT license, so you can verify.
 
 ## Economics
 
 - **Unit:** 1 impression = 5 visible seconds.
 - **Pricing:** advertisers buy blocks of 1,000 impressions (CPM). Clicks bill higher than impressions.
-- **Split:** users keep 50% of attributable revenue (`USER_SHARE = 0.5`).
+- **Split:** users keep 50% of attributable revenue.
 - **Balances** accrue per run and surface in `bf status` and the web dashboard.
 - **Payouts:** Stripe, once a balance crosses $25. Payout plumbing is planned, not live yet. Balances accrue today.
 - **Early inventory:** while the first advertiser slots sell, the slot is filled with house ads at `cpm = 0`. No money changes hands, but the slot is exercised and you see a real sponsored line.
@@ -204,25 +204,19 @@ Advertisers self-serve through the portal at [backfill.sh/advertiser](https://ba
 
 ### Ad selection
 
-Every candidate gets a single unified **eCPM in micros**, then the server picks the max under frequency-cap and flight-window gating. The components:
+The hosted Backfill service gives every candidate a single unified **eCPM in micros**, then picks the max under frequency-cap and flight-window gating. The components:
 
 - **Direct CPM**, what the advertiser pays per 1,000 impressions.
 - **Affiliate expected value** = `payout × conversion-rate prior`, converted to an eCPM equivalent.
 - **House floor**, the minimum to serve (currently 0 while house-ad inventory fills slots).
 
-Bayesian shrinkage tempers noisy per-campaign conversion priors, so a campaign with 3 clicks doesn't outrank one with 3,000. The knobs in `web/lib/ecpm.ts`:
-
-- `PRIOR_CVR_BPS = 50` (a 0.5% prior conversion rate)
-- `PRIOR_STRENGTH = 500` (the prior weighted as 500 ghost conversions)
-
-A frequency cap stops a device from seeing the same ad back to back across runs, and flight windows gate serving to a campaign's scheduled dates.
+Bayesian shrinkage tempers noisy per-campaign conversion priors, so a campaign with 3 clicks doesn't outrank one with 3,000. A frequency cap stops a device from seeing the same ad back to back across runs, and flight windows gate serving to a campaign's scheduled dates. The hosted service code is not part of this CLI repo.
 
 ## Repo layout
 
 | Dir | What |
 |---|---|
-| `cli/` | `bf`, the Go wrapper (~600 lines). Runs the two ad surfaces. |
-| `web/` | Next.js (App Router): landing, advertiser portal, dashboard, ad-serve + event API, Postgres via Drizzle on Neon. |
+| `cli/` | `bf`, the Go wrapper. Runs the terminal and coding-agent surfaces. |
 | `action/action.yml` | GitHub Action: the same model for CI build logs, with maintainer-directed earnings. |
 | `python/` | Thin Python wrapper shipped in the `backfill-cli` wheel: fetches + SHA-256-verifies the Go binary, re-signs it ad-hoc on macOS, then execs it. |
 
@@ -230,12 +224,10 @@ A frequency cap stops a device from seeing the same ad back to back across runs,
 
 What's covered today:
 
-- `cli/completion_test.go`, scaffold detection (the `create-*` / `cargo new` / `npm create` allowlist) and the one-line completion ad.
-- `web/lib/ads.test.ts`, eCPM ad selection: frequency cap, flight gating, deterministic tie-break.
-- `web/lib/ecpm.test.ts`, the eCPM math: direct CPM, affiliate expected value, Bayesian shrinkage with `PRIOR_CVR_BPS` and `PRIOR_STRENGTH`.
-- `web/lib/advertiser.test.ts`, advertiser balance math: deposits, full-CPM spend, balance, rounding.
+- CLI scaffold detection, including the `create-*` / `cargo new` / `npm create` allowlist and the one-line completion ad.
+- CLI output rotation, spinner text, receipts, captured logs, notifications, and drain behavior.
 
-Run the web tests with `npm test` in `web/`. Run the CLI tests with `go test ./...` in `cli/`.
+Run the CLI tests with `go test ./...` in `cli/`.
 
 ## License
 

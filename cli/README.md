@@ -1,6 +1,6 @@
 # bf
 
-`bf` runs long commands so you can earn while builds, tests, migrations, and data jobs run. Wrapped non-interactive commands collapse into one live line that carries the ad, a trending repo / HN story / tip, and your $earned tally, with a spinner and an elapsed timer. Coding agents (Claude Code, Factory droid, Codex) get a rotating spinner verb while they think. Revenue is split 50/50 with you. Privacy guarantee: `bf` never reads your code or command output; only the device id, ad id, command name, visible seconds, and event kind are transmitted.
+`bf` runs long commands so you can earn while builds, tests, migrations, and data jobs run. Wrapped non-interactive commands collapse into one live line that carries the ad, a trending repo / HN story / tip, and your $earned tally, with a spinner and an elapsed timer. Claude Code and Factory droid can get rotating spinner verbs while they think; Codex can run through `bf spin codex`. Revenue is split 50/50 with you. Privacy guarantee: `bf` never reads your code or command output; only the device id, ad id, command name, visible seconds, and event kind are transmitted.
 
 ## Install
 
@@ -24,10 +24,10 @@ bf uninit    # remove the shims
 bf on
 bf off
 bf status
-bf claim <email>
+bf claim
 bf agents install claude
 bf agents install droid
-bf agents install codex
+bf spin codex
 ```
 
 After `bf init`, plain `dbt run`, `dbt test`, `dbt build`, `cargo build`, and `docker build` earn without the `bf` prefix. The shim works wherever the command is launched (Makefiles, scripts, your shell). Interactive and full-screen commands (vim, less, ssh, sudo, gh, psql, `terraform apply`, `docker run -it`, `npm init` / `npm login`) are detected and run directly in your terminal, untouched. Non-interactive runs (CI, Airflow, dbt Cloud) detect no TTY and pass straight through with zero overhead.

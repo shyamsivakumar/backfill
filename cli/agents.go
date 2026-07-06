@@ -82,9 +82,9 @@ func cmdAgents(args []string) int {
 
 func agentsUsage() {
 	fmt.Print(`usage:
-  bf agents install [claude|codex|factory|all] [--force]
-  bf agents remove [claude|codex|factory|all]
-  bf agents status [claude|codex|factory|all]
+  bf agents install [claude|codex|factory|droid|all] [--force]
+  bf agents remove [claude|codex|factory|droid|all]
+  bf agents status [claude|codex|factory|droid|all]
 `)
 }
 
@@ -99,7 +99,7 @@ func parseAgentArgs(args []string, allowForce bool) ([]agentTarget, bool, bool) 
 				return nil, false, false
 			}
 			force = true
-		case "claude", "codex", "factory", "all":
+		case "claude", "codex", "factory", "droid", "all":
 			if target != "all" {
 				return nil, false, false
 			}
@@ -114,7 +114,7 @@ func parseAgentArgs(args []string, allowForce bool) ([]agentTarget, bool, bool) 
 		return []agentTarget{agentClaude}, force, true
 	case "codex":
 		return []agentTarget{agentCodex}, force, true
-	case "factory":
+	case "factory", "droid":
 		return []agentTarget{agentFactory}, force, true
 	default:
 		return []agentTarget{agentClaude, agentCodex, agentFactory}, force, true
