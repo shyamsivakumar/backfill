@@ -1,0 +1,2 @@
+{"idea_id":"bf-20260707-curl-installer-checksum","spec_path":".codex/feature-specs/bf-20260707-curl-installer-checksum.md","spec_sha":"676e536bad5eff87e28c6116a4cb809aabfc0288444ca1e932ffadea8f32734b","readiness_score":8,"risk":"medium","blockers":[],"reviewed_at":"2026-07-07T16:32:29Z"}
+{"idea_id":"bf-20260707-action-json-escaping","spec_path":".codex/feature-specs/bf-20260707-action-json-escaping.md","spec_sha":"adac740589471001947fc7d6414625fc4898014a229670cc97fdd243b1ba2f73","readiness_score":8,"risk":"medium","blockers":[],"reviewed_at":"2026-07-07T16:32:29Z"}
