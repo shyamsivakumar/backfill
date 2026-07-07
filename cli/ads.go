@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 )
@@ -57,20 +59,57 @@ var httpClient = &http.Client{
 	},
 }
 
+func debugLogf(format string, args ...any) {
+	if os.Getenv("BACKFILL_DEBUG") == "" {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "bf debug: "+format+"\n", args...)
+}
+
+func safeHTTPError(err error) string {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		if urlErr.Err != nil {
+			return fmt.Sprintf("%s: %T", urlErr.Op, urlErr.Err)
+		}
+		return urlErr.Op
+	}
+	return fmt.Sprintf("%T", err)
+}
+
+func fallbackAd() Ad {
+	return houseAds[rand.Intn(len(houseAds))]
+}
+
 func fetchAd(cfg *Config, cmd string) Ad {
 	u := fmt.Sprintf("%s/api/serve?cmd=%s&d=%s", cfg.APIBase, url.QueryEscape(cmd), cfg.DeviceID)
-	if resp, err := httpClient.Get(u); err == nil {
-		defer resp.Body.Close()
-		var ad Ad
-		if json.NewDecoder(resp.Body).Decode(&ad) == nil && ad.ID != "" && ad.Text != "" {
-			ad.ID = stripControlChars(ad.ID)
-			ad.Text = stripControlChars(ad.Text)
-			ad.URL = stripControlChars(ad.URL)
-			ad.SpinnerText = stripControlChars(ad.SpinnerText)
-			return ad
-		}
+	resp, err := httpClient.Get(u)
+	if err != nil {
+		debugLogf("ad serve failed for cmd %q: %s", cmd, safeHTTPError(err))
+		return fallbackAd()
 	}
-	return houseAds[rand.Intn(len(houseAds))]
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		debugLogf("ad serve returned HTTP %d for cmd %q", resp.StatusCode, cmd)
+		return fallbackAd()
+	}
+
+	var ad Ad
+	if err := json.NewDecoder(resp.Body).Decode(&ad); err != nil {
+		debugLogf("ad serve decode failed for cmd %q: %v", cmd, err)
+		return fallbackAd()
+	}
+	if ad.ID == "" || ad.Text == "" {
+		debugLogf("ad serve returned incomplete ad for cmd %q (id=%t text=%t)", cmd, ad.ID != "", ad.Text != "")
+		return fallbackAd()
+	}
+
+	ad.ID = stripControlChars(ad.ID)
+	ad.Text = stripControlChars(ad.Text)
+	ad.URL = stripControlChars(ad.URL)
+	ad.SpinnerText = stripControlChars(ad.SpinnerText)
+	return ad
 }
 
 // fetchAdsConcurrent fires count fetchAd calls in parallel against the shared
@@ -105,6 +144,7 @@ func stripControlChars(s string) string {
 
 func registerDevice(cfg *Config) {
 	if cfg.DeviceID == "" || cfg.DeviceSecret == "" {
+		debugLogf("device registration skipped: missing device id or secret")
 		return
 	}
 
@@ -115,8 +155,13 @@ func registerDevice(cfg *Config) {
 	})
 
 	resp, err := httpClient.Post(cfg.APIBase+"/api/device/register", "application/json", bytes.NewReader(body))
-	if err == nil {
-		resp.Body.Close()
+	if err != nil {
+		debugLogf("device registration failed: %s", safeHTTPError(err))
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		debugLogf("device registration returned HTTP %d", resp.StatusCode)
 	}
 }
 
@@ -133,8 +178,13 @@ func impressionBody(cfg *Config, ad Ad, cmd string, seconds int) *bytes.Reader {
 
 func postImpression(cfg *Config, ad Ad, cmd string, seconds int) {
 	resp, err := httpClient.Post(cfg.APIBase+"/api/events", "application/json", impressionBody(cfg, ad, cmd, seconds))
-	if err == nil {
-		resp.Body.Close()
+	if err != nil {
+		debugLogf("impression report failed for cmd %q: %s", cmd, safeHTTPError(err))
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		debugLogf("impression report returned HTTP %d for cmd %q", resp.StatusCode, cmd)
 	}
 }
 
