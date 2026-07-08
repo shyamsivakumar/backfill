@@ -47,4 +47,3 @@ The manager will also run held-out fixture cases with decoy checksum rows, archi
 - Bad or unclear checksum state returns non-zero with a useful error.
 - macOS resign and final `bf version` behavior are unchanged after a verified extraction.
 - README claims require no wording downgrade.
-

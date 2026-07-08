@@ -44,4 +44,3 @@ The manager will keep a held-out fake API response corpus with multiline JSON st
 - Plain log lines strip or replace CR/LF from server-provided text.
 - The action exits with the wrapped command's exit code.
 - Ad fetch and impression failures stay best-effort.
-
