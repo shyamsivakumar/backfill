@@ -24,27 +24,4 @@ runs:
         BF_DEVICE: ${{ inputs.device }}
         BF_RUN: ${{ inputs.run }}
       run: |
-        AD_JSON=$(curl -fsS --max-time 3 "$BF_API/api/serve?cmd=ci&d=$BF_DEVICE" || echo '')
-        AD_ID=$(echo "$AD_JSON" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
-        AD_TEXT=$(echo "$AD_JSON" | sed -n 's/.*"text":"\([^"]*\)".*/\1/p')
-        if [ -n "$AD_TEXT" ]; then
-          echo "::group::ad · $AD_TEXT"
-          echo "$BF_API/r/$AD_ID?d=$BF_DEVICE"
-          echo "::endgroup::"
-        fi
-        START=$(date +%s)
-        set +e
-        bash -c "$BF_RUN"
-        EXIT=$?
-        set -e
-        SECS=$(( $(date +%s) - START ))
-        if [ -n "$AD_ID" ] && [ -n "$BF_DEVICE" ] && [ "$SECS" -ge 5 ]; then
-          curl -fsS --max-time 3 -X POST "$BF_API/api/events" \
-            -H 'content-type: application/json' \
-            -d "{\"deviceId\":\"$BF_DEVICE\",\"adId\":\"$AD_ID\",\"cmd\":\"ci\",\"seconds\":$SECS,\"kind\":\"impression\"}" \
-            >/dev/null || true
-        fi
-        if [ -n "$AD_TEXT" ]; then
-          echo "ad · $AD_TEXT"
-        fi
-        exit $EXIT
+        bash "$GITHUB_ACTION_PATH/run.sh"
