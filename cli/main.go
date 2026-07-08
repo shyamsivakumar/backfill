@@ -96,9 +96,9 @@ usage:
   bf logs last             print the last captured build log
   bf refer                 print your referral install command
   bf spin <agent-command>  run an agent through the spinner rewriter
-  bf agents install        install the coding-agent spinner integration (claude, droid)
-  bf agents remove         remove the coding-agent spinner integration
-  bf agents status         show coding-agent spinner integration status
+  bf agents install        install coding-agent integrations (claude spinner, droid statusLine)
+  bf agents remove         remove coding-agent integrations
+  bf agents status         show coding-agent integration status
 `)
 }
 
