@@ -31,19 +31,27 @@ var dbtProgressSubcmds = map[string]bool{
 	"run": true, "build": true, "test": true, "seed": true, "snapshot": true,
 }
 
+var dbtLeadingFlagsWithValue = map[string]bool{
+	"--profiles-dir": true,
+	"--project-dir":  true,
+	"--profile":      true,
+	"--target":       true,
+	"--vars":         true,
+	"--log-level":    true,
+	"--log-format":   true,
+	"--log-path":     true,
+	"--target-path":  true,
+	"--state":        true,
+	"--defer-state":  true,
+}
+
 // isDbtRunFamily reports whether this is a dbt invocation that emits per-node
 // progress worth collapsing (run/build/test/seed/snapshot).
 func isDbtRunFamily(args []string) bool {
 	if len(args) < 2 || baseName(args[0]) != "dbt" {
 		return false
 	}
-	for _, a := range args[1:] {
-		if strings.HasPrefix(a, "-") {
-			continue
-		}
-		return dbtProgressSubcmds[a]
-	}
-	return false
+	return firstProgressSubcommand(args[1:], dbtProgressSubcmds, dbtLeadingFlagsWithValue)
 }
 
 func baseName(p string) string {
@@ -51,6 +59,36 @@ func baseName(p string) string {
 		return p[i+1:]
 	}
 	return p
+}
+
+func firstProgressSubcommand(args []string, subcmds map[string]bool, flagsWithValue map[string]bool) bool {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			if i+1 < len(args) {
+				return subcmds[args[i+1]]
+			}
+			return false
+		}
+		if strings.HasPrefix(a, "--") {
+			name := a
+			if eq := strings.IndexByte(name, '='); eq >= 0 {
+				name = name[:eq]
+			}
+			if flagsWithValue[name] && !strings.Contains(a, "=") && i+1 < len(args) {
+				i++
+			}
+			continue
+		}
+		if strings.HasPrefix(a, "-") && a != "-" {
+			if flagsWithValue[a] && i+1 < len(args) {
+				i++
+			}
+			continue
+		}
+		return subcmds[a]
+	}
+	return false
 }
 
 // runDbtProgress runs a dbt invocation with its routine per-node output collapsed
@@ -173,8 +211,15 @@ func (r *dbtRenderer) handle(line string) {
 			}
 		case "OK", "PASS":
 			r.done++
-		case "SKIP", "WARN":
+		case "SKIP":
 			r.done++
+		case "WARN":
+			r.done++
+			if r.log != nil {
+				r.log.checkpoint(plain)
+			}
+			r.passthroughLocked(line)
+			return
 		case "ERROR", "FAIL":
 			r.done++
 			if r.log != nil {
