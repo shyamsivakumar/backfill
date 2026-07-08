@@ -20,9 +20,9 @@ dbt run                    # runs exactly as before, with a sponsored line that 
 
 ## How it shows up
 
-There are exactly two surfaces, and no reserved row anywhere.
+There are two main surfaces.
 
-1. **Coding agents**. `bf agents install claude` sets Claude Code's thinking-spinner verb to a rotating batch. `bf agents install droid` does the same for Factory droid, and Codex can be launched through `bf spin codex`. The ad, a trending dev content slot, and your running `$X.XX earned` tally cycle while the agent thinks. It installs no Claude status line and never touches an existing one. Claude refreshes the verb on `SessionStart` and each turn.
+1. **Coding agents**. `bf agents install claude` sets Claude Code's thinking-spinner verb to a rotating batch. `bf agents install droid` installs a Factory droid statusLine. Codex can be launched through `bf spin codex`. The ad, a trending dev content slot, and your running `$X.XX earned` tally cycle while the agent thinks. Claude installs no status line and never touches an existing one. Claude refreshes the verb on `SessionStart` and each turn.
 2. **Any other wrapped command** (dbt, sqlmesh, cargo, docker, make, `terraform plan`, npm/pnpm/yarn/bun install, pip, go). The run collapses into one live line that rotates the ad, a trending repo / HN story / tip, and your $earned tally, with a spinner and an elapsed timer. That single line replaces the scrolling output in place. On a non-zero exit the captured output is flushed, so failures are never hidden. dbt and sqlmesh also show model progress counts on that line.
 
 Interactive and full-screen commands (vim, less, ssh, sudo, gh, psql and other REPLs, `terraform apply`, `docker run -it`, `npm init` / `npm login`) are detected and run directly in your terminal, untouched. CI and non-TTY runs exec plainly with zero overhead.
@@ -80,13 +80,16 @@ On **Paradime**, the durable path is `bf init`. It adds a real `export PATH="$HO
 | `bf on` / `bf off` | Globally pause or resume. `off` execs plainly with zero overhead, as if no shim is installed. |
 | `bf status` | Show what's wrapped, current `on`/`off` state, and your device id and dashboard link. |
 | `bf claim` | Print a one-time code and link to bind this device to your web account, so earnings show in your dashboard. |
+| `bf last` | Show the last run receipt, including status, command, duration, estimated earnings, and checkpoints. |
+| `bf logs last` | Print the captured log from the most recent wrapped run. |
+| `bf refer` | Print a referral install command. You earn a 10% bonus from Backfill's share, not from the referred user's share. |
 | `bf agents install claude` | Spinner-verb rotation for Claude Code. No status line. |
-| `bf agents install droid` | Spinner-verb rotation for Factory `droid`. No status line. |
+| `bf agents install droid` | Factory `droid` statusLine integration. Refuses to overwrite an existing statusLine unless you pass `--force`. |
 | `bf spin codex` | Run Codex through the spinner rewriter. |
 | `bf agents remove <name>` | Remove a previously installed agent integration. |
 | `bf agents status` | Show which agent integrations are installed. |
 
-`bf wrap droid` adds the spinner-verb injection for Factory droid without the full agent install (handy for droid-specific sessions).
+`bf wrap droid` routes Factory droid through the `bf spin` rewriter without installing the Factory statusLine integration (handy for droid-specific sessions).
 
 ## How the wrapper works
 
@@ -151,16 +154,16 @@ Scaffold completions are separate (see above): after `npm create` / `npm init`, 
 | Agent | Integration | Install |
 |---|---|---|
 | Claude Code | Spinner-verb rotation (no status line) | `bf agents install claude` |
-| Factory (`droid`) | Spinner-verb rotation (no status line) | `bf agents install droid` |
+| Factory (`droid`) | StatusLine integration | `bf agents install droid` |
 | Codex | Spinner rewriter for the running command | `bf spin codex` |
 
-For Claude Code you can also install via the plugin marketplace: `/plugin marketplace add shyamsivakumar/backfill` then `/plugin install backfill@backfill`. `bf agents remove claude` undoes it.
+For Factory droid spinner rewriting without a statusLine, use `bf wrap droid`. For Claude Code you can also install via the plugin marketplace: `/plugin marketplace add shyamsivakumar/backfill` then `/plugin install backfill@backfill`. `bf agents remove claude` undoes it.
 
 ## What it sells that no other ad network can
 
 - **Command-level segments.** Advertisers buy "developers currently running dbt," not "developers." The command name is the only targeting signal. No keywords, no profiles, no behavior graph.
 - **Verified dwell.** A live line during a 15-minute compile is continuous, unskippable attention. There's no tab to switch away from without abandoning the build.
-- **CI earnings routing.** Via the GitHub Action, a repo points its build-log earnings at its maintainers. Your CI minutes fund the dependencies you build on.
+- **CI earnings routing.** Via the GitHub Action, a repo points its build-log earnings at its maintainers by passing a Backfill device id. Your CI minutes fund the dependencies you build on.
 
 ## Surfaces
 
@@ -168,7 +171,7 @@ For Claude Code you can also install via the plugin marketplace: `/plugin market
 |---|---|---|
 | dbt + data stack | `dbt`, `bq`, `snowsql`, `spark-submit`, `sqlmesh` | `bf init` (curated set) or `bf wrap <cmd>` |
 | Any CLI tool | `cargo`, `docker`, `make`, `terraform`, `gradle`, … | `bf init` covers these, or `bf wrap <cmd>` / `bf init --all` |
-| Coding agents | Claude Code / Factory droid spinner verbs; Codex spinner rewrite | `bf agents install …` or `bf spin codex` |
+| Coding agents | Claude Code spinner verbs, Factory droid statusLine, Codex spinner rewrite | `bf agents install …` or `bf spin codex` |
 | Scaffold screens | `npm create`, `cargo new`, `rails new`, … | automatic on a clean wrapped run |
 | CI build logs | the GitHub Action (`action/action.yml`) | maintainer-directed earnings |
 

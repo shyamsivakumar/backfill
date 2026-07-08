@@ -1,5 +1,5 @@
 name: 'Backfill'
-description: 'Run a command with a sponsored line in the CI log. Impressions accrue to your Backfill account.'
+description: 'Run a command with a sponsored line in the CI log. Set device to credit impressions.'
 branding:
   icon: 'dollar-sign'
   color: 'yellow'
@@ -8,7 +8,7 @@ inputs:
     description: 'Command to run'
     required: true
   device:
-    description: 'Backfill device id (from bf status) to credit impressions to'
+    description: 'Backfill device id from bf status. Without it, the line can render but no impression is credited.'
     required: false
     default: ''
   api:

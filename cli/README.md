@@ -1,6 +1,6 @@
 # bf
 
-`bf` runs long commands so you can earn while builds, tests, migrations, and data jobs run. Wrapped non-interactive commands collapse into one live line that carries the ad, a trending repo / HN story / tip, and your $earned tally, with a spinner and an elapsed timer. Claude Code and Factory droid can get rotating spinner verbs while they think; Codex can run through `bf spin codex`. Revenue is split 50/50 with you. Privacy guarantee: `bf` never reads your code or command output; only the device id, ad id, command name, visible seconds, and event kind are transmitted.
+`bf` runs long commands so you can earn while builds, tests, migrations, and data jobs run. Wrapped non-interactive commands collapse into one live line that carries the ad, a trending repo / HN story / tip, and your $earned tally, with a spinner and an elapsed timer. Claude Code can get rotating spinner verbs while it thinks, Factory droid can get a statusLine via `bf agents install droid`, and Codex can run through `bf spin codex`. Revenue is split 50/50 with you. Privacy guarantee: `bf` never reads your code or command output; only the device id, ad id, command name, visible seconds, and event kind are transmitted.
 
 ## Install
 
@@ -25,8 +25,12 @@ bf on
 bf off
 bf status
 bf claim
+bf last
+bf logs last
+bf refer
 bf agents install claude
 bf agents install droid
+bf wrap droid
 bf spin codex
 ```
 
