@@ -24,19 +24,24 @@ var sqlmeshElapsedRe = regexp.MustCompile(`^\s*\d+(\.\d+)?s\s*$`)
 
 var sqlmeshProgressSubcmds = map[string]bool{"plan": true, "run": true}
 
+var sqlmeshLeadingFlagsWithValue = map[string]bool{
+	"--config":          true,
+	"-c":                true,
+	"--gateway":         true,
+	"-g":                true,
+	"--path":            true,
+	"--paths":           true,
+	"-p":                true,
+	"--default-catalog": true,
+}
+
 // isSqlmeshRunFamily reports whether this is a sqlmesh invocation that emits per-model
 // progress worth collapsing (plan/run).
 func isSqlmeshRunFamily(args []string) bool {
 	if len(args) < 2 || baseName(args[0]) != "sqlmesh" {
 		return false
 	}
-	for _, a := range args[1:] {
-		if strings.HasPrefix(a, "-") {
-			continue
-		}
-		return sqlmeshProgressSubcmds[a]
-	}
-	return false
+	return firstProgressSubcommand(args[1:], sqlmeshProgressSubcmds, sqlmeshLeadingFlagsWithValue)
 }
 
 // runSqlmeshProgress runs a sqlmesh invocation with its routine per-model output
