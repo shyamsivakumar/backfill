@@ -61,15 +61,13 @@ def _read_expected_sha256(archive_url, archive_name):
     matching = []
     for line in data.splitlines():
         parts = line.split()
-        if len(parts) < 2:
+        if len(parts) != 2:
             continue
         digest = parts[0].lower()
         if not re.fullmatch(r"[0-9a-f]{64}", digest):
             continue
-        names = [part.lstrip("*") for part in parts[1:]]
-        if archive_name in names or any(
-            name.endswith("/" + archive_name) for name in names
-        ):
+        name = parts[1].lstrip("*")
+        if name == archive_name or name.endswith("/" + archive_name):
             matching.append(digest)
 
     unique = sorted(set(matching))
