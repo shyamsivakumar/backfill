@@ -179,6 +179,10 @@ func discoverTools() []string {
 
 func writeRCBlocks(remove bool) []string {
 	home, _ := os.UserHomeDir()
+	return writeRCBlocksIn(home, remove)
+}
+
+func writeRCBlocksIn(home string, remove bool) []string {
 	var changed []string
 	for _, rc := range []string{".zshrc", ".bashrc"} {
 		p := filepath.Join(home, rc)
@@ -200,13 +204,37 @@ func writeRCBlocks(remove bool) []string {
 }
 
 func stripMarked(s, start, end string) string {
-	a := strings.Index(s, start)
-	b := strings.Index(s, end)
-	if a == -1 || b == -1 || b < a {
-		return s
+	var out strings.Builder
+	scan := 0
+	for {
+		aRel := strings.Index(s[scan:], start)
+		if aRel == -1 {
+			out.WriteString(s[scan:])
+			return out.String()
+		}
+		a := scan + aRel
+		afterStart := a + len(start)
+		relEnd := strings.Index(s[afterStart:], end)
+		if relEnd == -1 {
+			out.WriteString(s[scan:])
+			return out.String()
+		}
+		b := afterStart + relEnd
+		if strings.Contains(s[afterStart:b], start) {
+			out.WriteString(s[scan:afterStart])
+			scan = afterStart
+			continue
+		}
+		out.WriteString(strings.TrimRight(s[scan:a], "\n"))
+		out.WriteString("\n")
+		scan = b + len(end)
+		if strings.HasPrefix(s[scan:], "\n") {
+			scan++
+		}
+		if scan >= len(s) {
+			return out.String()
+		}
 	}
-	tail := strings.TrimPrefix(s[b+len(end):], "\n")
-	return strings.TrimRight(s[:a], "\n") + "\n" + tail
 }
 
 func stripBlock(s string) string {
