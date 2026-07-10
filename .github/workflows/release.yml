@@ -5,12 +5,11 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
-
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,3 +26,50 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+
+  # Keep publishing in this workflow so a failed release or asset gate leaves
+  # PyPI untouched. Rollback is a revert of this workflow change.
+  pypi:
+    needs: release
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gate publishing on matching release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-gate"
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" \
+            > "$RUNNER_TEMP/release-gate/release.json"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "checksums.txt" \
+            --dir "$RUNNER_TEMP/release-gate"
+          python3 scripts/validate_release_assets.py \
+            --release-json "$RUNNER_TEMP/release-gate/release.json" \
+            --checksums "$RUNNER_TEMP/release-gate/checksums.txt" \
+            --tag "$RELEASE_TAG"
+
+      - name: Sync package version from tag
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          sed -i "s/^version = .*/version = \"$V\"/" python/pyproject.toml
+
+      - name: Build Python distribution
+        run: python -m pip install build && python -m build python/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist/
