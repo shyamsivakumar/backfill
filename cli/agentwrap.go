@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"sync"
 	"syscall"
 	"time"
@@ -21,9 +22,7 @@ import (
 // the ad just before the anchor so it rides the processing line every frame.
 var spinnerAnchors = [][]byte{
 	[]byte("Esc to interrupt"),
-	[]byte("esc to interrupt"),
 	[]byte("Press ESC to stop"),
-	[]byte("press esc to stop"),
 }
 
 // Spinner verbs agents print in the verb slot of the processing line. Replacing the
@@ -35,6 +34,11 @@ var spinnerVerbs = [][]byte{
 	[]byte("Streaming…"), []byte("Streaming..."),
 	[]byte("Working"),
 }
+
+// spinnerLeadRE distinguishes a live status frame from prose that happens to
+// mention an interrupt shortcut. ANSI is stripped before matching, so a colored
+// spinner glyph and verb still count as a leading gerund.
+var spinnerLeadRE = regexp.MustCompile(`(?i)^[^[:alpha:]]*[[:alpha:]][[:alpha:]-]*ing(?:\.\.\.|…)?(?:[^[:alpha:]]|$)`)
 
 type spinnerRewriter struct {
 	ad      []byte
@@ -48,35 +52,86 @@ type spinnerRewriter struct {
 // On a spinner frame it replaces the known verb with the ad; if the verb is an
 // unknown rotating gerund, it injects the ad just before the anchor as a fallback.
 func (r *spinnerRewriter) transform(b []byte) []byte {
-	out := b
-	anchor := r.frameAnchor(out)
-	if anchor == nil {
-		return out
-	}
-
-	replaced := false
-	for _, v := range spinnerVerbs {
-		if bytes.Contains(out, v) {
-			out = bytes.ReplaceAll(out, v, r.ad)
-			replaced = true
+	out := make([]byte, 0, len(b)+len(r.ad))
+	start := 0
+	changed := false
+	for i, c := range b {
+		if c != '\r' && c != '\n' {
+			continue
 		}
+		frame, rewritten := r.transformFrame(b[start:i])
+		out = append(out, frame...)
+		out = append(out, c)
+		changed = changed || rewritten
+		start = i + 1
 	}
-	if !replaced {
-		out = bytes.ReplaceAll(out, anchor, append(append([]byte{}, r.ad...), append([]byte("  "), anchor...)...))
+	frame, rewritten := r.transformFrame(b[start:])
+	out = append(out, frame...)
+	changed = changed || rewritten
+	if !changed {
+		return b
+	}
+	return out
+}
+
+func (r *spinnerRewriter) transformFrame(frame []byte) ([]byte, bool) {
+	anchorStart, _, ok := findSpinnerAnchor(frame)
+	if !ok || !spinnerLeadRE.MatchString(stripANSI(string(frame[:anchorStart]))) {
+		return frame, false
 	}
 
 	r.active = true
 	r.lastHit = time.Now()
-	return out
+	if len(r.ad) == 0 || bytes.Contains(frame, r.ad) {
+		return frame, false
+	}
+
+	if start, end, ok := findSpinnerVerb(frame[:anchorStart]); ok {
+		out := make([]byte, 0, len(frame)-end+start+len(r.ad))
+		out = append(out, frame[:start]...)
+		out = append(out, r.ad...)
+		out = append(out, frame[end:]...)
+		return out, true
+	}
+
+	out := make([]byte, 0, len(frame)+len(r.ad)+2)
+	out = append(out, frame[:anchorStart]...)
+	out = append(out, r.ad...)
+	out = append(out, ' ', ' ')
+	out = append(out, frame[anchorStart:]...)
+	return out, true
 }
 
-func (r *spinnerRewriter) frameAnchor(b []byte) []byte {
-	for _, a := range spinnerAnchors {
-		if bytes.Contains(b, a) {
-			return a
+func findSpinnerAnchor(frame []byte) (int, int, bool) {
+	lower := bytes.ToLower(frame)
+	bestStart := -1
+	bestLen := 0
+	for _, anchor := range spinnerAnchors {
+		needle := bytes.ToLower(anchor)
+		if start := bytes.Index(lower, needle); start >= 0 && (bestStart < 0 || start < bestStart) {
+			bestStart = start
+			bestLen = len(needle)
 		}
 	}
-	return nil
+	if bestStart < 0 {
+		return 0, 0, false
+	}
+	return bestStart, bestStart + bestLen, true
+}
+
+func findSpinnerVerb(framePrefix []byte) (int, int, bool) {
+	bestStart := -1
+	bestLen := 0
+	for _, verb := range spinnerVerbs {
+		if start := bytes.Index(framePrefix, verb); start >= 0 && (bestStart < 0 || start < bestStart) {
+			bestStart = start
+			bestLen = len(verb)
+		}
+	}
+	if bestStart < 0 {
+		return 0, 0, false
+	}
+	return bestStart, bestStart + bestLen, true
 }
 
 func runWithRewrite(cfg *Config, bin string, args []string) int {
