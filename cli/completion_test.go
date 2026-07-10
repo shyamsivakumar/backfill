@@ -1,6 +1,8 @@
 package main
 
 import (
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -16,16 +18,21 @@ func TestIsScaffoldCommand(t *testing.T) {
 		{[]string{"pnpm", "create", "next-app"}, true},
 		{[]string{"yarn", "create", "react-app", "myapp"}, true},
 		{[]string{"bun", "create", "next"}, true},
+		{[]string{"npm", "--silent", "create", "vite@latest"}, true},
+		{[]string{"pnpm", "--filter", "web", "init"}, true},
+		{[]string{filepath.Join("tmp", "shims", "npm"), "create", "vite"}, true},
 
 		// positive: npx create-* scaffolders
 		{[]string{"npx", "create-react-app", "myapp"}, true},
 		{[]string{"npx", "create-next-app", "--typescript"}, true},
 		{[]string{"npx", "create-vite"}, true},
+		{[]string{"npx", "--yes", "create-vite"}, true},
 
 		// positive: bare create-* binaries
 		{[]string{"create-react-app", "myapp"}, true},
 		{[]string{"create-next-app", "."}, true},
 		{[]string{"create-vite", "myproject"}, true},
+		{[]string{"create-npm"}, true},
 
 		// positive: cargo new / init
 		{[]string{"cargo", "new", "myproject"}, true},
@@ -105,13 +112,9 @@ func TestCompletionAdLine(t *testing.T) {
 		t.Errorf("completionAdLine: expected trailing newline, got %q", line)
 	}
 
-	// Must NOT contain scroll-region escapes (footer-only)
-	if strings.Contains(line, "\x1b[") && strings.Contains(line, "r") {
-		// More precise: must not contain the scroll-region pattern \x1b[<n>;<m>r
-		// Check for the specific scroll-region CSI sequences used in footer
-		if strings.Contains(line, "\x1b[1;") {
-			t.Errorf("completionAdLine: must not contain scroll-region escape in %q", line)
-		}
+	// Must NOT contain a DECSTBM scroll-region escape (footer-only).
+	if regexp.MustCompile("\x1b\\[[0-9;]*r").MatchString(line) {
+		t.Errorf("completionAdLine: must not contain scroll-region escape in %q", line)
 	}
 
 	// Must NOT contain cursor-save escape \x1b7
@@ -129,47 +132,84 @@ func TestCompletionAdLine(t *testing.T) {
 
 func TestIsInstallCommand(t *testing.T) {
 	cases := []struct {
+		name string
 		args []string
 		want bool
 	}{
-		{[]string{"npm", "install"}, true},
-		{[]string{"pnpm", "i"}, true},
-		{[]string{"yarn", "add", "x"}, true},
-		{[]string{"yarn"}, true},
-		{[]string{"bun", "install"}, true},
-		{[]string{"pip", "install", "foo"}, true},
-		{[]string{"pip3", "install"}, true},
-		{[]string{"npm", "run", "build"}, false},
-		{[]string{"npm", "create", "vite"}, false},
-		{[]string{"cargo", "build"}, false},
-		{[]string{"docker", "build"}, false},
-		{nil, false},
+		{name: "npm install", args: []string{"npm", "install"}, want: true},
+		{name: "npm i", args: []string{"npm", "i"}, want: true},
+		{name: "npm ci", args: []string{"npm", "ci"}, want: true},
+		{name: "npm update", args: []string{"npm", "update"}, want: true},
+		{name: "pnpm add", args: []string{"pnpm", "add", "x"}, want: true},
+		{name: "yarn bare", args: []string{"yarn"}, want: true},
+		{name: "yarn add", args: []string{"yarn", "add", "x"}, want: true},
+		{name: "bun install", args: []string{"bun", "install"}, want: true},
+		{name: "pip install", args: []string{"pip", "install", "foo"}, want: true},
+		{name: "pip3 install", args: []string{"pip3", "install"}, want: true},
+
+		{name: "flag before npm install", args: []string{"npm", "--silent", "install"}, want: true},
+		{name: "workspace before npm install", args: []string{"npm", "--workspace", "web", "install"}, want: true},
+		{name: "workspace equals before npm ci", args: []string{"npm", "--workspace=web", "ci"}, want: true},
+		{name: "filter before pnpm add", args: []string{"pnpm", "--filter", "web", "add", "x"}, want: true},
+		{name: "filter equals before pnpm add", args: []string{"pnpm", "--filter=web", "add", "x"}, want: true},
+		{name: "cwd before bun install", args: []string{"bun", "--cwd", "web", "install"}, want: true},
+		{name: "separator before npm install", args: []string{"npm", "--", "install"}, want: true},
+		{name: "workspace after npm install", args: []string{"npm", "install", "--workspace", "web"}, want: true},
+		{name: "global flag after npm install", args: []string{"npm", "install", "-g", "x"}, want: true},
+		{name: "filter after pnpm add", args: []string{"pnpm", "add", "--filter", "web", "x"}, want: true},
+		{name: "pip option after install", args: []string{"pip3", "install", "--no-deps", "x"}, want: true},
+		{name: "resolved npm shim", args: []string{filepath.Join("tmp", "shims", "npm"), "install"}, want: true},
+
+		{name: "npm run build", args: []string{"npm", "run", "build"}, want: false},
+		{name: "npm test", args: []string{"npm", "test"}, want: false},
+		{name: "flag before npm run", args: []string{"npm", "--silent", "run", "build"}, want: false},
+		{name: "pnpm dev", args: []string{"pnpm", "dev"}, want: false},
+		{name: "filtered pnpm dev", args: []string{"pnpm", "--filter", "web", "dev"}, want: false},
+		{name: "bun run", args: []string{"bun", "run", "start"}, want: false},
+		{name: "npm scaffold", args: []string{"npm", "create", "vite"}, want: false},
+		{name: "npx scaffold", args: []string{"npx", "create-app"}, want: false},
+		{name: "npminstall near miss", args: []string{"npminstall", "x"}, want: false},
+		{name: "bunx near miss", args: []string{"bunx", "install"}, want: false},
+		{name: "create-npm near miss", args: []string{"create-npm"}, want: false},
+		{name: "cargo", args: []string{"cargo", "build"}, want: false},
+		{name: "empty", args: []string{}, want: false},
+		{name: "nil", args: nil, want: false},
 	}
 	for _, c := range cases {
-		if got := isInstallCommand(c.args); got != c.want {
-			t.Errorf("isInstallCommand(%v) = %v, want %v", c.args, got, c.want)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			if got := isInstallCommand(c.args); got != c.want {
+				t.Errorf("isInstallCommand(%v) = %v, want %v", c.args, got, c.want)
+			}
+		})
 	}
 }
 
-func TestIsNpmFamily(t *testing.T) {
-	cases := []struct {
-		args []string
-		want bool
+func TestPackageManagerInvocation(t *testing.T) {
+	tests := []struct {
+		name                        string
+		args                        []string
+		wantManager, wantSubcommand string
+		wantOK                      bool
 	}{
-		{[]string{"npm", "run", "build"}, true},
-		{[]string{"npm", "install"}, true},
-		{[]string{"pnpm", "dev"}, true},
-		{[]string{"yarn"}, true},
-		{[]string{"bun", "run", "start"}, true},
-		{[]string{"cargo", "build"}, false},
-		{[]string{"pip", "install"}, false},
-		{[]string{"dbt", "run"}, false},
-		{nil, false},
+		{name: "empty", args: nil},
+		{name: "bare npm", args: []string{"npm"}, wantManager: "npm", wantOK: true},
+		{name: "boolean option", args: []string{"npm", "--silent", "install"}, wantManager: "npm", wantSubcommand: "install", wantOK: true},
+		{name: "equals value option", args: []string{"npm", "--workspace=web", "ci"}, wantManager: "npm", wantSubcommand: "ci", wantOK: true},
+		{name: "separate value option", args: []string{"pnpm", "--filter", "web", "add"}, wantManager: "pnpm", wantSubcommand: "add", wantOK: true},
+		{name: "separator", args: []string{"npm", "--", "install"}, wantManager: "npm", wantSubcommand: "install", wantOK: true},
+		{name: "trailing separator", args: []string{"npm", "--"}, wantManager: "npm", wantOK: true},
+		{name: "resolved shim", args: []string{filepath.Join("tmp", "shims", "npm"), "install"}, wantManager: "npm", wantSubcommand: "install", wantOK: true},
+		{name: "npminstall near miss", args: []string{"npminstall", "x"}},
+		{name: "bunx near miss", args: []string{"bunx", "vite"}},
+		{name: "create-npm near miss", args: []string{"create-npm"}},
 	}
-	for _, c := range cases {
-		if got := isNpmFamily(c.args); got != c.want {
-			t.Errorf("isNpmFamily(%v) = %v, want %v", c.args, got, c.want)
-		}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager, subcommand, ok := packageManagerInvocation(tt.args)
+			if manager != tt.wantManager || subcommand != tt.wantSubcommand || ok != tt.wantOK {
+				t.Fatalf("packageManagerInvocation(%v) = (%q, %q, %v), want (%q, %q, %v)", tt.args, manager, subcommand, ok, tt.wantManager, tt.wantSubcommand, tt.wantOK)
+			}
+		})
 	}
 }

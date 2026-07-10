@@ -34,6 +34,6 @@ bf wrap droid
 bf spin codex
 ```
 
-After `bf init`, plain `dbt run`, `dbt test`, `dbt build`, `cargo build`, and `docker build` earn without the `bf` prefix. The shim works wherever the command is launched (Makefiles, scripts, your shell). Interactive and full-screen commands (vim, less, ssh, sudo, gh, psql, `terraform apply`, `docker run -it`, `npm init` / `npm login`) are detected and run directly in your terminal, untouched. Non-interactive runs (CI, Airflow, dbt Cloud) detect no TTY and pass straight through with zero overhead.
+After `bf init`, plain `dbt run`, `dbt test`, `dbt build`, `cargo build`, and `docker build` earn without the `bf` prefix. The shim works wherever the command is launched (Makefiles, scripts, your shell). Interactive and full-screen commands (vim, less, ssh, sudo, gh, psql, `terraform apply`, `docker run -it`, `npm login`) are detected and run directly in your terminal, untouched. Package-manager scaffolders such as `npm init` keep native prompts and add one completion ad after success. Package installs also run plainly with native progress and a success completion ad; package-manager scripts remain collapsed. Non-interactive runs (CI, Airflow, dbt Cloud) detect no TTY and pass straight through with zero overhead.
 
 <https://backfill.sh>
