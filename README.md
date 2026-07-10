@@ -175,6 +175,85 @@ For Factory droid spinner rewriting without a statusLine, use `bf wrap droid`. F
 | Scaffold screens | `npm create`, `cargo new`, `rails new`, … | automatic on a clean wrapped run |
 | CI build logs | the GitHub Action (`action/action.yml`) | maintainer-directed earnings |
 
+## GitHub Action
+
+Use the composite action to put a sponsored line in a GitHub Actions job and
+credit eligible impressions to a Backfill device. The action runs the command
+from `run` and returns the same exit code.
+
+Run `bf status` locally to find the device id you want to credit. Save it as a
+repository Actions secret named `BACKFILL_DEVICE_ID` instead of committing it
+to the workflow. Then add this file at `.github/workflows/backfill.yml`:
+
+```yaml
+name: Backfill CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests with Backfill
+        uses: shyamsivakumar/backfill/action@<tag-or-sha>
+        with:
+          run: make test
+          device: ${{ secrets.BACKFILL_DEVICE_ID }}
+```
+
+Replace `<tag-or-sha>` with a Backfill release tag or, for a fixed supply-chain
+pin, a full commit SHA. The `contents: read` permission lets the checkout step
+read the repository. The Backfill step does not use `GITHUB_TOKEN` and needs no
+write permission.
+
+### Forks and missing device ids
+
+GitHub does not pass repository Actions secrets to `pull_request` workflows
+from forks. On those runs, `device` is empty. The action can still fetch and
+render a sponsored line, then run `make test`, but it skips the impression POST
+and credits no device. The same behavior applies whenever `device` is omitted.
+
+Do not change this job to `pull_request_target` to expose the secret to forked
+code. Keep the ordinary `pull_request` trigger so untrusted changes run without
+repository secrets.
+
+### Failures and logs
+
+The wrapped command controls the step result. If `make test` exits 7, the
+Backfill step exits 7 and the job fails normally. The command's stdout and
+stderr stay in the GitHub Actions log; Backfill does not send that output to
+its API.
+
+Ad response text is escaped or flattened before it is written to the log, so
+server-provided text such as `::error::...` cannot create a GitHub workflow
+command. `action/test_action.sh` covers this case, missing-device crediting,
+and non-zero exit pass-through.
+
+### CI privacy
+
+The action makes these Backfill API requests:
+
+- To fetch an ad, it sends the static command name `ci` and the supplied device
+  id, which is empty when `device` is unset.
+- After a run of at least 5 seconds, it posts an impression only when both an
+  ad id and device id are present. That JSON contains `deviceId`, `adId`, the
+  static `cmd` value `ci`, elapsed `seconds`, and `kind: "impression"`.
+
+Beyond the device id passed explicitly, it does not transmit the `run` string,
+repository contents, paths, other environment variables, pull request or
+commit metadata, stdout, or stderr. It does not read other Actions secrets.
+
+The optional `api` input defaults to `https://backfill.sh`. Set it only for a
+self-test or staging endpoint. Normal workflows should omit it.
+
 ## Privacy
 
 The CLI is structurally incapable of reading your code, command args, command output, or environment. The only fields it ever transmits:
