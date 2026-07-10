@@ -23,9 +23,9 @@ dbt run                    # runs exactly as before, with a sponsored line that 
 There are two main surfaces.
 
 1. **Coding agents**. `bf agents install claude` sets Claude Code's thinking-spinner verb to a rotating batch. `bf agents install droid` installs a Factory droid statusLine. Codex can be launched through `bf spin codex`. The ad, a trending dev content slot, and your running `$X.XX earned` tally cycle while the agent thinks. Claude installs no status line and never touches an existing one. Claude refreshes the verb on `SessionStart` and each turn.
-2. **Any other wrapped command** (dbt, sqlmesh, cargo, docker, make, `terraform plan`, npm/pnpm/yarn/bun install, pip, go). The run collapses into one live line that rotates the ad, a trending repo / HN story / tip, and your $earned tally, with a spinner and an elapsed timer. That single line replaces the scrolling output in place. On a non-zero exit the captured output is flushed, so failures are never hidden. dbt and sqlmesh also show model progress counts on that line.
+2. **Any other wrapped command** (dbt, sqlmesh, cargo, docker, make, `terraform plan`, npm/pnpm/yarn/bun scripts, go). The run collapses into one live line that rotates the ad, a trending repo / HN story / tip, and your $earned tally, with a spinner and an elapsed timer. That single line replaces the scrolling output in place. On a non-zero exit the captured output is flushed, so failures are never hidden. dbt and sqlmesh also show model progress counts on that line. Package installs are the plain-output exception described below.
 
-Interactive and full-screen commands (vim, less, ssh, sudo, gh, psql and other REPLs, `terraform apply`, `docker run -it`, `npm init` / `npm login`) are detected and run directly in your terminal, untouched. CI and non-TTY runs exec plainly with zero overhead.
+Interactive and full-screen commands (vim, less, ssh, sudo, gh, psql and other REPLs, `terraform apply`, `docker run -it`, `npm login`) are detected and run directly in your terminal, untouched. Package-manager scaffolders such as `npm init` also keep their native terminal interaction, then get one completion ad after a successful exit. CI and non-TTY runs exec plainly with zero overhead.
 
 ## Install
 
@@ -96,7 +96,7 @@ On **Paradime**, the durable path is `bf init`. It adds a real `export PATH="$HO
 `bf <cmd>` runs `<cmd>` and collapses its output into one live line. There is no pseudo-terminal on the collapsed path, no scroll region, and no reserved row.
 
 - A wrapped non-interactive command has its stdout and stderr piped and collapsed into the one live line. On a non-zero exit the captured output is flushed, so failures are never hidden.
-- Interactive and full-screen commands (vim, less, ssh, sudo, gh, psql and other REPLs, `terraform apply`, `docker run -it`, `npm init` / `npm login`) are detected and run directly in your terminal, untouched.
+- Interactive and full-screen commands (vim, less, ssh, sudo, gh, psql and other REPLs, `terraform apply`, `docker run -it`, `npm login`) are detected and run directly in your terminal, untouched. Package-manager scaffolders keep native prompts and add only their success completion ad.
 - Exit codes pass through end to end.
 - Non-TTY execs (CI, Airflow, dbt Cloud, cron) run plainly with zero overhead: the shim detects no TTY and just `exec`s the underlying binary.
 
@@ -133,17 +133,17 @@ After any of the following exits 0, `bf` prints one persistent sponsored line un
 - `dotnet new`
 - any binary named `create-*` on your `PATH` that exits 0
 
-The line prints once under whatever success UI the scaffolder drew. These commands finish too fast for the live line to earn, but their "you're all set, here's what's next" screen is the highest-intent moment in the session.
+Package-manager scaffolders run plainly so their prompts remain usable. The other listed scaffolders use the normal collapsed route. In both cases, the line prints once under whatever success UI the scaffolder drew. These commands finish too fast for the live line to earn, but their "you're all set, here's what's next" screen is the highest-intent moment in the session.
 
 ## npm and package installs
 
-Package installs are long waits worth monetizing. `bf init` wraps `npm`, `pnpm`, and `yarn`; add `bun` with `bf wrap bun`. A plain install then runs through the collapsed live line while it resolves and downloads:
+Package installs are long waits worth monetizing. `bf init` wraps `npm`, `pnpm`, and `yarn`; add `bun` with `bf wrap bun`. Installs do not collapse: they stay attached to the terminal so the package manager's own resolving, download, and build progress remains visible.
 
 ```sh
 npm install
 ```
 
-There's no smart-progress collapsing for installs, `bf` just runs the live line. `npm init` and `npm login` are interactive, so they pass straight through to your terminal. CI and non-TTY installs pass through plainly.
+After a successful install, `bf` prints one persistent sponsored completion line under the package manager's own summary. Failed installs keep their native output and do not print that line. Examples covered by this contract include `npm install` / `i` / `ci` / `update`, `pnpm add`, bare `yarn` and its install commands, `bun install`, `pip install`, and their supported install aliases. Package-manager scripts such as `npm run build`, `npm test`, `pnpm dev`, and `bun run start` still use the collapsed live line. `npm login` passes through untouched; `npm init` follows the scaffold contract above. CI and non-TTY installs pass through plainly with no completion ad.
 
 Scaffold completions are separate (see above): after `npm create` / `npm init`, the pnpm/yarn/bun equivalents, or `npx create-*` exit 0, `bf` prints one persistent sponsored line under the "you're all set" success screen.
 
