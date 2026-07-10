@@ -1,0 +1,83 @@
+{
+  "base_release": {
+    "tag_name": "v1.2.3",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {"name": "backfill_darwin_amd64.tar.gz"},
+      {"name": "backfill_darwin_arm64.tar.gz"},
+      {"name": "backfill_linux_amd64.tar.gz"},
+      {"name": "backfill_linux_arm64.tar.gz"},
+      {"name": "checksums.txt"}
+    ]
+  },
+  "base_checksums": "1111111111111111111111111111111111111111111111111111111111111111  backfill_darwin_amd64.tar.gz\n2222222222222222222222222222222222222222222222222222222222222222  backfill_darwin_arm64.tar.gz\n3333333333333333333333333333333333333333333333333333333333333333  backfill_linux_amd64.tar.gz\n4444444444444444444444444444444444444444444444444444444444444444  backfill_linux_arm64.tar.gz\n",
+  "cases": [
+    {
+      "name": "complete release",
+      "valid": true
+    },
+    {
+      "name": "missing checksums asset",
+      "remove_assets": ["checksums.txt"],
+      "errors": ["missing release asset: checksums.txt"]
+    },
+    {
+      "name": "missing archive",
+      "remove_assets": ["backfill_linux_arm64.tar.gz"],
+      "errors": ["missing release asset: backfill_linux_arm64.tar.gz"]
+    },
+    {
+      "name": "checksums omit archive",
+      "remove_checksum_entries": ["backfill_darwin_arm64.tar.gz"],
+      "errors": ["checksums.txt does not mention: backfill_darwin_arm64.tar.gz"]
+    },
+    {
+      "name": "malformed checksum line",
+      "append_checksum_lines": ["not-a-checksum"],
+      "errors": ["malformed checksums.txt line"]
+    },
+    {
+      "name": "duplicate checksum entry",
+      "duplicate_checksum_entries": ["backfill_linux_amd64.tar.gz"],
+      "errors": ["duplicate checksum entry: backfill_linux_amd64.tar.gz"]
+    },
+    {
+      "name": "draft release",
+      "release_overrides": {"draft": true},
+      "errors": ["release must be explicitly non-draft"]
+    },
+    {
+      "name": "prerelease",
+      "release_overrides": {"prerelease": true},
+      "errors": ["release must be explicitly non-prerelease"]
+    },
+    {
+      "name": "extra asset",
+      "add_assets": ["release-notes.md"],
+      "valid": true
+    },
+    {
+      "name": "changed asset ordering",
+      "reverse_assets": true,
+      "valid": true
+    },
+    {
+      "name": "duplicate asset name",
+      "duplicate_assets": ["backfill_linux_amd64.tar.gz"],
+      "errors": ["duplicate release asset: backfill_linux_amd64.tar.gz"]
+    },
+    {
+      "name": "leading-v tag",
+      "tag": "v9.8.7",
+      "release_overrides": {"tag_name": "v9.8.7"},
+      "valid": true
+    },
+    {
+      "name": "tag without leading v",
+      "tag": "1.2.3",
+      "release_overrides": {"tag_name": "1.2.3"},
+      "errors": ["tag must use the release form vMAJOR.MINOR.PATCH"]
+    }
+  ]
+}
