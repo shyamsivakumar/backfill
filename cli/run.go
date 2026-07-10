@@ -44,6 +44,42 @@ func lastBytes(b []byte, n int) []byte {
 
 const minBillableSeconds = 5
 
+type wrappedRunMode uint8
+
+const (
+	wrappedRunCollapsed wrappedRunMode = iota
+	wrappedRunPlain
+)
+
+type wrappedRunPlan struct {
+	mode         wrappedRunMode
+	completionAd bool
+}
+
+func shouldBypassWrapping(enabled, stdinTTY, stdoutTTY bool) bool {
+	return !enabled || !stdinTTY || !stdoutTTY
+}
+
+// planWrappedRun is the testable contract for the generic wrapper path.
+// Specialized dbt and SQLMesh progress routes run before this plan is used.
+func planWrappedRun(args []string) wrappedRunPlan {
+	switch {
+	case isInstallCommand(args):
+		return wrappedRunPlan{mode: wrappedRunPlain, completionAd: true}
+	case isPackageManagerScaffoldCommand(args):
+		// Package-manager scaffolders may prompt, so preserve their native TTY
+		// while still appending the promised completion ad on success.
+		return wrappedRunPlan{mode: wrappedRunPlain, completionAd: true}
+	case isInteractiveCommand(args):
+		return wrappedRunPlan{mode: wrappedRunPlain}
+	default:
+		return wrappedRunPlan{
+			mode:         wrappedRunCollapsed,
+			completionAd: isScaffoldCommand(args),
+		}
+	}
+}
+
 func runWrapped(args []string) int {
 	deshimPath()
 	bin, err := exec.LookPath(args[0])
@@ -52,7 +88,11 @@ func runWrapped(args []string) int {
 		return 127
 	}
 	cfg := loadConfig()
-	if !cfg.Enabled || !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+	if shouldBypassWrapping(
+		cfg.Enabled,
+		term.IsTerminal(int(os.Stdin.Fd())),
+		term.IsTerminal(int(os.Stdout.Fd())),
+	) {
 		return runPlain(bin, args)
 	}
 	// Stash the live terminal width so the tty-less spinner hook can size verbs.
@@ -65,18 +105,13 @@ func runWrapped(args []string) int {
 	if isDbtRunFamily(args) {
 		return runDbtProgress(cfg, bin, args)
 	}
-	// Interactive / full-screen commands run plain: collapsing their output
-	// would hide prompts and look like a hang. Plain adds no extra line either.
-	if isInteractiveCommand(args) {
-		return runPlain(bin, args)
-	}
-	// Package installs (npm/pnpm/yarn/bun/pip install) draw a TTY-only progress
-	// bar that goes SILENT on a pipe, so collapsing them looks frozen. Run them
-	// attached to the real terminal so their native progress shows, and put the
-	// sponsored line on the completion screen instead.
-	if isInstallCommand(args) {
+
+	plan := planWrappedRun(args)
+	if plan.mode == wrappedRunPlain {
+		// Interactive commands stay usable, while installs and package-manager
+		// scaffolders keep native progress/prompts and get one success ad.
 		exit := runPlain(bin, args)
-		if exit == 0 {
+		if plan.completionAd && exit == 0 {
 			ad := fetchAd(cfg, args[0])
 			if ad.ID != "" {
 				fmt.Fprint(os.Stdout, completionAdLine(cfg, ad))
@@ -85,11 +120,11 @@ func runWrapped(args []string) int {
 		}
 		return exit
 	}
-	// Everything else (cargo, docker build, make, terraform plan, go, …) collapses
-	// into a single in-place line that rotates ads, trending content, and the
-	// earnings tally. No reserved footer row anywhere.
+
+	// Package-manager scripts and other non-interactive commands collapse into
+	// one in-place line. Non-package scaffolders retain their completion ad.
 	exit, ad, secs := runCollapsed(cfg, bin, args)
-	if isScaffoldCommand(args) && exit == 0 && ad.ID != "" {
+	if plan.completionAd && exit == 0 && ad.ID != "" {
 		fmt.Fprint(os.Stdout, completionAdLine(cfg, ad))
 		if secs < minBillableSeconds {
 			reportImpression(cfg, ad, args[0], minBillableSeconds)
