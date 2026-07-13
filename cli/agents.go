@@ -237,7 +237,7 @@ func removeClaudeAgent() int {
 		return 1
 	}
 	if !exists {
-		fmt.Println("Claude Code settings not found; backfill statusLine is not installed")
+		fmt.Println("Claude Code settings not found; backfill spinner integration is not installed")
 		return 0
 	}
 
@@ -252,7 +252,7 @@ func removeClaudeAgent() int {
 		return 1
 	}
 	if !exists {
-		fmt.Println("Claude Code settings not found; backfill statusLine is not installed")
+		fmt.Println("Claude Code settings not found; backfill spinner integration is not installed")
 		return 0
 	}
 
@@ -267,7 +267,7 @@ func removeClaudeAgent() int {
 			}
 		}
 		fmt.Printf("Claude Code current statusLine: %s\n", jsonValue(current))
-		fmt.Println("Claude Code backfill statusLine is not installed")
+		fmt.Println("Claude Code backfill spinner integration is not installed")
 		fmt.Println("Claude Code removed spinner verb replacement")
 		return 0
 	}
@@ -291,7 +291,7 @@ func removeClaudeAgent() int {
 		fmt.Println(err)
 		return 1
 	}
-	fmt.Println("Claude Code removed backfill statusLine")
+	fmt.Println("Claude Code removed legacy backfill statusLine")
 	fmt.Println("Claude Code removed spinner verb replacement")
 	return 0
 }
@@ -303,8 +303,8 @@ func statusClaudeAgent() int {
 		return 1
 	}
 	if !exists {
-		fmt.Println("Claude Code current statusLine: null")
-		fmt.Println("Claude Code backfill: false")
+		fmt.Println("Claude Code statusLine: not managed (settings not found)")
+		fmt.Println("Claude Code backfill spinner: false")
 		fmt.Println("Claude Code spinnerVerbs: false")
 		fmt.Println("Claude Code spinner-refresh hook: false")
 		return 0
